@@ -1,0 +1,15 @@
+{
+  "name": "streamora",
+  "version": "0.0.1",
+  "private": true,
+  "description": "GCP Self-Managed Video Uploading Platform",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api start:dev",
+    "dev:worker": "pnpm --filter worker dev",
+    "dev": "concurrently -n WEB,API,WORKER \"pnpm dev:web\" \"pnpm dev:api\" \"pnpm dev:worker\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

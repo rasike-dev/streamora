@@ -1,0 +1,12 @@
+{
+  "name": "@streamora/shared",
+  "version": "0.0.1",
+  "description": "Shared types and DTOs for Streamora",
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {},
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.5.3"
+  }
+}
