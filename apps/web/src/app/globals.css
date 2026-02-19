@@ -1,3 +1,24 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --background: 255 255 255;
+  --foreground: 0 0 0;
+  --muted: 245 245 245;
+}
+
+.dark {
+  --background: 10 10 10;
+  --foreground: 245 245 245;
+  --muted: 25 25 25;
+}
+
+body {
+  background: rgb(var(--background));
+  color: rgb(var(--foreground));
+}
+
+.text-muted-foreground {
+  color: rgba(var(--foreground), 0.6);
+}

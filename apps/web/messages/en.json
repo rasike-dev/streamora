@@ -1,0 +1,18 @@
+{
+  "app": { "name": "Streamora" },
+  "nav": { "login": "Login", "dashboard": "Dashboard", "admin": "Admin" },
+  "login": { "title": "Login", "cta": "Continue with Streamora Login" },
+  "dashboard": {
+    "title": "Creator Dashboard",
+    "createDraft": "Create Draft",
+    "myVideos": "My Videos",
+    "form": {
+      "title": "Title",
+      "description": "Description",
+      "tagline": "Tagline",
+      "channels": "Channels",
+      "tags": "Tags (comma separated)",
+      "save": "Save Draft"
+    }
+  }
+}

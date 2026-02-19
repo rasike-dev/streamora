@@ -4,14 +4,20 @@
   "description": "Streamora Worker - FFmpeg processing service",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "nodemon --watch src --exec ts-node src/index.ts",
+    "dev": "nodemon --watch src --exec ts-node src/worker.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/worker.js"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@google-cloud/pubsub": "^4.1.1",
+    "@google-cloud/storage": "^7.7.0",
+    "@prisma/client": "5.19.1",
+    "dotenv": "^16.4.5"
+  },
   "devDependencies": {
     "@types/node": "^20.14.10",
     "nodemon": "^3.1.0",
+    "prisma": "5.19.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.3"
   }

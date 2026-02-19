@@ -1,0 +1,18 @@
+{
+  "app": { "name": "Streamora" },
+  "nav": { "login": "ඇතුල් වන්න", "dashboard": "ඩැෂ්බෝඩ්", "admin": "පරිපාලක" },
+  "login": { "title": "ඇතුල් වන්න", "cta": "Streamora හරහා ඉදිරියට" },
+  "dashboard": {
+    "title": "නිර්මාතෘ ඩැෂ්බෝඩ්",
+    "createDraft": "කෙටුම්පතක් සාදන්න",
+    "myVideos": "මගේ වීඩියෝ",
+    "form": {
+      "title": "ශීර්ෂය",
+      "description": "විස්තරය",
+      "tagline": "ටැග්ලයින්",
+      "channels": "නාලිකා",
+      "tags": "ටැග් (කොමාවෙන් වෙන් කරන ලද)",
+      "save": "කෙටුම්පත සුරකින්න"
+    }
+  }
+}

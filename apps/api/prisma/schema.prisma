@@ -1,0 +1,286 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum CreatorApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum VideoStatus {
+  DRAFT
+  UPLOADED
+  PROCESSING
+  READY
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PUBLISHED
+  TAKEDOWN
+  ARCHIVED
+}
+
+enum Visibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+enum UploadStatus {
+  INITIATED
+  UPLOADING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  keycloakSub   String   @unique
+  email         String?
+  username      String?
+  displayName   String?
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  roles         UserRole[]
+  creatorProfile CreatorProfile?
+  videos        Video[] @relation("UploaderVideos")
+
+  @@index([keycloakSub])
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  role      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@index([role])
+}
+
+model CreatorProfile {
+  id            String @id @default(cuid())
+  userId        String @unique
+  approval      CreatorApprovalStatus @default(PENDING)
+  notes         String?
+  dailyUploadLimitMinutes Int? // optional quota
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Channel {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  videos    VideoChannel[]
+  translations ChannelTranslation[]
+
+  @@index([slug])
+  @@index([isActive])
+}
+
+model ChannelTranslation {
+  id        String @id @default(cuid())
+  channelId String
+  locale    String // en | si | ta
+  name      String
+  description String?
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, locale])
+  @@index([locale])
+}
+
+model Tag {
+  id         String   @id @default(cuid())
+  name       String
+  slug       String   @unique
+  preferred  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  videos     VideoTag[]
+  translations TagTranslation[]
+
+  @@index([slug])
+}
+
+model TagTranslation {
+  id     String @id @default(cuid())
+  tagId  String
+  locale String
+  name   String
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, locale])
+  @@index([locale])
+}
+
+model Video {
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  status          VideoStatus @default(DRAFT)
+  visibility      Visibility @default(PRIVATE)
+  publishAt       DateTime?
+  uploaderId      String?
+  uploaderVisible Boolean   @default(false) // stays false until creator approved (your rule)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  uploader   User? @relation("UploaderVideos", fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  translations VideoTranslation[]
+  channels     VideoChannel[]
+  tags         VideoTag[]
+  uploadIntents UploadIntent[]
+  asset        VideoAsset?
+  thumbnails   VideoThumbnail[]
+  renditions   VideoRendition[]
+
+  @@index([status])
+  @@index([visibility])
+  @@index([publishAt])
+  @@index([uploaderId])
+}
+
+model VideoTranslation {
+  id          String @id @default(cuid())
+  videoId     String
+  locale      String // en | si | ta
+  title       String?
+  description String?
+  tagline     String?
+  audience    String? // later could be JSON/enum flags
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, locale])
+  @@index([locale])
+}
+
+model VideoChannel {
+  videoId   String
+  channelId String
+
+  video   Video   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@id([videoId, channelId])
+  @@index([channelId])
+}
+
+model VideoTag {
+  videoId String
+  tagId   String
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([videoId, tagId])
+  @@index([tagId])
+}
+
+model UploadIntent {
+  id          String       @id @default(cuid())
+  videoId     String
+  objectKey   String
+  bucket      String
+  contentType String
+  sizeBytes   BigInt
+  status      UploadStatus @default(INITIATED)
+
+  // Progress tracking
+  uploadedBytes BigInt     @default(0)
+  lastError     String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId])
+  @@index([status])
+}
+
+model VideoAsset {
+  id          String   @id @default(cuid())
+  videoId     String   @unique
+  bucket      String
+  originalKey String
+  contentType String
+  sizeBytes   BigInt
+  durationSec Float?   // filled later by ffprobe
+  width       Int?
+  height      Int?
+  hlsBucket    String?
+  hlsMasterKey String?  // e.g. renditions/{videoId}/master.m3u8
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([bucket])
+}
+
+model VideoThumbnail {
+  id        String   @id @default(cuid())
+  videoId   String
+  bucket    String
+  objectKey String
+  width     Int?
+  height    Int?
+  timeSec   Float?    // timestamp used for the frame
+  isSelected Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId])
+}
+
+model VideoRendition {
+  id          String   @id @default(cuid())
+  videoId     String
+  quality     String   // "360p" | "720p" etc.
+  playlistKey String   // path to variant playlist (or master for quality)
+  bandwidth   Int?
+  width       Int?
+  height      Int?
+  codec       String?
+
+  createdAt   DateTime @default(now())
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId])
+  @@unique([videoId, quality])
+}
