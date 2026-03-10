@@ -8,16 +8,17 @@ export class ChannelsService {
   async findAll(locale: string = 'en') {
     const channels = await this.prisma.channel.findMany({
       where: { isActive: true },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       include: {
-        translations: {
-          where: { locale },
-        },
+        translations: true,
       },
     });
 
     return channels.map((channel) => {
-      const translation = channel.translations[0];
+      const translation =
+        channel.translations.find((x) => x.locale === locale) ||
+        channel.translations.find((x) => x.locale === 'en') ||
+        null;
       return {
         id: channel.id,
         slug: channel.slug,

@@ -1,9 +1,13 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreatorVideosQueryService } from './creator-videos-query.service';
 
 @Injectable()
 export class VideosService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private queryService: CreatorVideosQueryService,
+  ) {}
 
   async createDraft(keycloakSub: string, data: {
     locale: string;
@@ -12,7 +16,14 @@ export class VideosService {
     tagline?: string;
     channelIds?: string[];
     tagIds?: string[];
-  }) {
+  }, requestId?: string) {
+    if (requestId) {
+      console.log(`[${requestId}] creator.videos.draft.create start`, {
+        keycloakSub,
+        locale: data.locale,
+      });
+    }
+
     // Find user by keycloakSub
     const user = await this.prisma.user.findUnique({
       where: { keycloakSub },
@@ -179,5 +190,200 @@ export class VideosService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async getDraft(videoId: string, keycloakSub: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { keycloakSub },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const video = await this.prisma.video.findFirst({
+      where: {
+        id: videoId,
+        uploaderId: user.id,
+      },
+      include: {
+        translations: true,
+        channels: { include: { channel: true } },
+        tags: { include: { tag: true } },
+      },
+    });
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    return video;
+  }
+
+  async updateDraftFull(
+    videoId: string,
+    keycloakSub: string,
+    data: {
+      translations?: Array<{
+        locale: 'en' | 'si' | 'ta';
+        title?: string;
+        description?: string;
+        tagline?: string;
+        audience?: string;
+      }>;
+      channels?: string[];
+      tags?: string[];
+    }
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { keycloakSub },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const video = await this.prisma.video.findFirst({
+      where: { id: videoId, uploaderId: user.id },
+    });
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    // Check if video is editable
+    const editable = ['DRAFT', 'UPLOADED', 'PROCESSING_FAILED', 'READY', 'REJECTED'];
+    if (!editable.includes(video.status)) {
+      throw new BadRequestException('Video not editable in current status');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Update translations
+      if (data.translations) {
+        for (const t of data.translations) {
+          await tx.videoTranslation.upsert({
+            where: {
+              videoId_locale: {
+                videoId,
+                locale: t.locale,
+              },
+            },
+            update: {
+              title: t.title ?? null,
+              description: t.description ?? null,
+              tagline: t.tagline ?? null,
+              audience: t.audience ?? null,
+            },
+            create: {
+              videoId,
+              locale: t.locale,
+              title: t.title ?? null,
+              description: t.description ?? null,
+              tagline: t.tagline ?? null,
+              audience: t.audience ?? null,
+            },
+          });
+        }
+      }
+
+      // Update channels (by slug)
+      if (data.channels !== undefined) {
+        await tx.videoChannel.deleteMany({ where: { videoId } });
+
+        for (const slug of data.channels) {
+          const channel = await tx.channel.findUnique({
+            where: { slug },
+          });
+
+          if (channel) {
+            await tx.videoChannel.create({
+              data: {
+                videoId,
+                channelId: channel.id,
+              },
+            });
+          }
+        }
+      }
+
+      // Update tags (by slug)
+      if (data.tags !== undefined) {
+        await tx.videoTag.deleteMany({ where: { videoId } });
+
+        for (const slug of data.tags) {
+          const tag = await tx.tag.findUnique({
+            where: { slug },
+          });
+
+          if (tag) {
+            await tx.videoTag.create({
+              data: {
+                videoId,
+                tagId: tag.id,
+              },
+            });
+          }
+        }
+      }
+    });
+
+    // Return updated video
+    return this.prisma.video.findUnique({
+      where: { id: videoId },
+      include: {
+        translations: true,
+        channels: { include: { channel: true } },
+        tags: { include: { tag: true } },
+      },
+    });
+  }
+
+  async submitForModeration(videoId: string, keycloakSub: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { keycloakSub },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const video = await this.prisma.video.findFirst({
+      where: { id: videoId, uploaderId: user.id },
+    });
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    // Only allow submission from READY status
+    if (video.status !== 'READY') {
+      throw new BadRequestException('Video must be READY to submit for moderation');
+    }
+
+    await this.prisma.video.update({
+      where: { id: videoId },
+      data: {
+        status: 'PENDING_APPROVAL',
+      },
+    });
+
+    return { success: true, videoId, status: 'PENDING_APPROVAL' };
+  }
+
+  async getUserByKeycloakSub(keycloakSub: string) {
+    return this.prisma.user.findUnique({
+      where: { keycloakSub },
+    });
+  }
+
+  async queryMine(userId: string, opts: {
+    locale: string;
+    q?: string;
+    status?: string;
+    visibility?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    return this.queryService.listMine(userId, opts);
   }
 }

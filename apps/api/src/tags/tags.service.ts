@@ -9,14 +9,15 @@ export class TagsService {
     const tags = await this.prisma.tag.findMany({
       orderBy: [{ preferred: 'desc' }, { name: 'asc' }],
       include: {
-        translations: {
-          where: { locale },
-        },
+        translations: true,
       },
     });
 
     return tags.map((tag) => {
-      const translation = tag.translations[0];
+      const translation =
+        tag.translations.find((x) => x.locale === locale) ||
+        tag.translations.find((x) => x.locale === 'en') ||
+        null;
       return {
         id: tag.id,
         slug: tag.slug,

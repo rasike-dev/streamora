@@ -193,6 +193,38 @@ async function generateHls(inputPath: string, outDir: string) {
 async function processMessage(evt: VideoUploadedEvent) {
   const thumbBucket = mustEnv("GCS_BUCKET_THUMBS");
 
+  // Extract correlation ID from event or generate one
+  const correlationId =
+    (evt as any).correlationId ||
+    `job-${evt.videoId}-${Date.now()}`;
+
+  // Check for duplicate running job BEFORE creating new one
+  const existingRunning = await prisma.processingJob.findFirst({
+    where: {
+      videoId: evt.videoId,
+      status: "RUNNING",
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (existingRunning) {
+    console.log(`[${correlationId}] Skipping duplicate running job for videoId=${evt.videoId}, existing job: ${existingRunning.id}`);
+    return;
+  }
+
+  // Create job row at processing start
+  const job = await prisma.processingJob.create({
+    data: {
+      videoId: evt.videoId,
+      uploadIntentId: evt.uploadIntentId,
+      jobType: "THUMBS_HLS",
+      status: "RUNNING",
+      attempts: 1,
+      correlationId,
+      startedAt: new Date(),
+    },
+  });
+
   // Update video status → PROCESSING
   await prisma.video.update({
     where: { id: evt.videoId },
@@ -238,8 +270,21 @@ async function processMessage(evt: VideoUploadedEvent) {
   const thumbFiles = await extractThumbnails(localVideoPath, outDir, times);
   const uploadedThumbs = await uploadThumbsToGcs(evt.videoId, thumbBucket, thumbFiles);
 
-  // Write thumbs to DB (replace any existing thumbs for this video)
-  await prisma.videoThumbnail.deleteMany({ where: { videoId: evt.videoId } });
+  // Write thumbs to DB (replace any existing AUTO thumbs, preserve CUSTOM)
+  // Check if there's already a selected thumbnail
+  const existingSelected = await prisma.videoThumbnail.findFirst({
+    where: { videoId: evt.videoId, isSelected: true },
+  });
+
+  // Delete only AUTO thumbnails, preserve CUSTOM
+  // After Prisma migration is run, this will work with source: 'AUTO'
+  // Until then, we need to use type assertion
+  await prisma.videoThumbnail.deleteMany({
+    where: { videoId: evt.videoId, source: 'AUTO' } as any,
+  });
+
+  // If no selected thumbnail exists, select the first generated one
+  const shouldSelectFirst = !existingSelected;
 
   await prisma.videoThumbnail.createMany({
     data: uploadedThumbs.map((t, idx) => ({
@@ -247,7 +292,8 @@ async function processMessage(evt: VideoUploadedEvent) {
       bucket: t.bucket,
       objectKey: t.objectKey,
       timeSec: t.timeSec,
-      isSelected: idx === 0, // select first by default (can change with UI in Phase 2)
+      source: 'AUTO',
+      isSelected: shouldSelectFirst && idx === 0,
     })),
   });
 
@@ -286,11 +332,30 @@ async function processMessage(evt: VideoUploadedEvent) {
   });
 
   // Video status after thumbs + HLS
-  // If creator pending → keep pending approval later (Day 9 logic),
-  // but for now mark READY (processing done)
+  // Day 9: Set to PENDING_APPROVAL or APPROVED based on creator approval
+  const video = await prisma.video.findUnique({ where: { id: evt.videoId } });
+  if (!video) throw new Error("Video not found");
+
+  let nextStatus: any = "PENDING_APPROVAL";
+
+  if (video.uploaderId) {
+    const profile = await prisma.creatorProfile.findUnique({ where: { userId: video.uploaderId } });
+    if (profile?.approval === "APPROVED") nextStatus = "APPROVED";
+  }
+
   await prisma.video.update({
     where: { id: evt.videoId },
-    data: { status: "READY" },
+    data: { status: nextStatus },
+  });
+
+  // Update job row on success
+  await prisma.processingJob.update({
+    where: { id: job.id },
+    data: {
+      status: "SUCCEEDED",
+      completedAt: new Date(),
+      lastError: null,
+    },
   });
 
   // Cleanup

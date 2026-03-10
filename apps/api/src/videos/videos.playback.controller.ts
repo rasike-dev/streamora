@@ -12,15 +12,13 @@ export class VideosPlaybackController {
 
     const masterUrl = `https://storage.googleapis.com/${asset.hlsBucket}/${asset.hlsMasterKey}`;
 
-    const thumbs = await this.prisma.videoThumbnail.findMany({
-      where: { videoId },
-      orderBy: { createdAt: 'asc' },
-      take: 1,
-    });
+      const selectedThumb = await this.prisma.videoThumbnail.findFirst({
+        where: { videoId, isSelected: true },
+      });
 
-    const thumbUrl = thumbs[0]
-      ? `https://storage.googleapis.com/${thumbs[0].bucket}/${thumbs[0].objectKey}`
-      : null;
+      const thumbUrl = selectedThumb
+        ? `https://storage.googleapis.com/${selectedThumb.bucket}/${selectedThumb.objectKey}`
+        : null;
 
     return { videoId, masterUrl, thumbUrl };
   }

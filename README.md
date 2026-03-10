@@ -26,6 +26,26 @@ docker compose up -d
 pnpm dev
 ```
 
+### Running Apps Separately
+
+**Web App (Next.js)**
+```bash
+pnpm dev:web
+# Runs on: http://localhost:3000
+```
+
+**API (NestJS)**
+```bash
+pnpm dev:api
+# Runs on: http://localhost:3001
+```
+
+**Worker (FFmpeg Processing)**
+```bash
+pnpm dev:worker
+# Listens to Pub/Sub for video processing events
+```
+
 ### Services
 
 - **Web**: http://localhost:3000 (Next.js PWA)

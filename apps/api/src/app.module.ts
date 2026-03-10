@@ -1,4 +1,6 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
+import { RequestIdMiddleware } from './common/request-id.middleware';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
@@ -15,7 +17,30 @@ import { UploadFailController } from './uploads/uploads.fail.controller';
 import { CreatorUploadsController } from './uploads/uploads.creator.controller';
 import { UploadCompleteV2Controller } from './uploads/uploads.complete-v2.controller';
 import { VideoThumbsController } from './videos/video-thumbs.controller';
+import { CreatorVideoThumbnailsController } from './videos/video-thumbnails.controller';
+import { CreatorVideoThumbnailsService } from './videos/video-thumbnails.service';
+import { CreatorVideoVisibilityController } from './videos/video-visibility.controller';
+import { CreatorVideoVisibilityService } from './videos/video-visibility.service';
+import { CreatorVideoScheduleController } from './videos/video-schedule.controller';
+import { CreatorVideoScheduleService } from './videos/video-schedule.service';
+import { ScheduledPublisherService } from './videos/scheduled-publisher.service';
 import { VideosPlaybackController } from './videos/videos.playback.controller';
+import { PublicVideosController } from './public/public.videos.controller';
+import { PublicVideoBySlugController } from './public/public.video-by-slug.controller';
+import { PublicVideoShareController } from './public/public.video-share.controller';
+import { PublicChannelsController } from './public/public-channels.controller';
+import { PublicChannelsService } from './public/public-channels.service';
+import { PublicVideosService } from './public/public-videos.service';
+import { CreatorVideosQueryService } from './videos/creator-videos-query.service';
+import { PublicVideoAnalyticsController } from './public/public-video-analytics.controller';
+import { PublicVideoAnalyticsService } from './public/public-video-analytics.service';
+import { CreatorVideoAnalyticsController } from './videos/creator-video-analytics.controller';
+import { CreatorVideoAnalyticsService } from './videos/creator-video-analytics.service';
+import { AdminModerationController } from './admin/admin.moderation.controller';
+import { AdminUsersController } from './admin/admin.users.controller';
+import { AdminChannelsController } from './admin/admin.channels.controller';
+import { AdminTagsController } from './admin/admin.tags.controller';
+import { AdminJobsController } from './admin/admin.jobs.controller';
 import { GcsService } from './storage/gcs.service';
 import { PubsubService } from './events/pubsub.service';
 
@@ -25,6 +50,7 @@ import { PubsubService } from './events/pubsub.service';
       envFilePath: ['.env', '../../.env'], // Try root .env, then fallback
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     ChannelsModule,
@@ -42,8 +68,26 @@ import { PubsubService } from './events/pubsub.service';
     CreatorUploadsController,
     UploadCompleteV2Controller,
     VideoThumbsController,
+    CreatorVideoThumbnailsController,
+    CreatorVideoVisibilityController,
+    CreatorVideoScheduleController,
     VideosPlaybackController,
+    PublicVideosController,
+    PublicVideoBySlugController,
+    PublicVideoShareController,
+    PublicChannelsController,
+    PublicVideoAnalyticsController,
+    CreatorVideoAnalyticsController,
+    AdminModerationController,
+    AdminUsersController,
+    AdminChannelsController,
+    AdminTagsController,
+    AdminJobsController,
   ],
-  providers: [GcsService, PubsubService],
+  providers: [GcsService, PubsubService, CreatorVideoThumbnailsService, CreatorVideoVisibilityService, CreatorVideoScheduleService, ScheduledPublisherService, PublicChannelsService, PublicVideosService, CreatorVideosQueryService, PublicVideoAnalyticsService, CreatorVideoAnalyticsService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}

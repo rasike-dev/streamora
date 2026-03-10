@@ -21,12 +21,17 @@ export class UploadCompleteV2Controller {
     private pubsub: PubsubService
   ) {}
 
-  @Post('uploads/:id/complete')
-  @UseGuards(JwtGuard)
-  async complete(@Req() req: any, @Param('id') uploadIntentId: string) {
-    const sub = req.user?.sub;
-    const user = await this.prisma.user.findUnique({ where: { keycloakSub: sub } });
-    if (!user) throw new NotFoundException('User not found');
+    @Post('uploads/:id/complete')
+    @UseGuards(JwtGuard)
+    async complete(@Req() req: any, @Param('id') uploadIntentId: string) {
+      console.log(`[${req.requestId}] uploads.complete start`, {
+        uploadIntentId,
+        userSub: req.user?.sub,
+      });
+
+      const sub = req.user?.sub;
+      const user = await this.prisma.user.findUnique({ where: { keycloakSub: sub } });
+      if (!user) throw new NotFoundException('User not found');
 
     const intent = await this.prisma.uploadIntent.findUnique({
       where: { id: uploadIntentId },
@@ -101,22 +106,29 @@ export class UploadCompleteV2Controller {
     const topic = process.env.PUBSUB_TOPIC_VIDEO_UPLOADED!;
     if (!topic) throw new BadRequestException('Missing PUBSUB_TOPIC_VIDEO_UPLOADED');
 
-    await this.pubsub.publish(topic, {
-      type: 'video.uploaded',
-      videoId: intent.videoId,
-      uploadIntentId: intent.id,
-      bucket: intent.bucket,
-      objectKey: intent.objectKey,
-      contentType,
-      sizeBytes: actualSize,
-      occurredAt: new Date().toISOString(),
-    });
+      await this.pubsub.publish(topic, {
+        type: 'video.uploaded',
+        videoId: intent.videoId,
+        uploadIntentId: intent.id,
+        bucket: intent.bucket,
+        objectKey: intent.objectKey,
+        contentType,
+        sizeBytes: actualSize,
+        occurredAt: new Date().toISOString(),
+        correlationId: req.requestId,
+      });
 
-    return {
-      ok: true,
-      videoId: intent.videoId,
-      uploadIntentId: intent.id,
-      objectKey: intent.objectKey,
-    };
+      console.log(`[${req.requestId}] uploads.complete success`, {
+        uploadIntentId: intent.id,
+        videoId: intent.videoId,
+        objectKey: intent.objectKey,
+      });
+
+      return {
+        ok: true,
+        videoId: intent.videoId,
+        uploadIntentId: intent.id,
+        objectKey: intent.objectKey,
+      };
+    }
   }
-}

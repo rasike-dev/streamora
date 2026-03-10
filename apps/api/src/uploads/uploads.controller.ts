@@ -43,13 +43,39 @@ export class UploadsController {
       throw new BadRequestException('Not owner of this video');
     }
 
-    // Basic size policy hook (tune later)
-    const roles: string[] = req.user?.realm_access?.roles ?? [];
-    const isPending = roles.includes('CREATOR_PENDING');
-    const maxBytes = isPending ? 250 * 1024 * 1024 : 2 * 1024 * 1024 * 1024; // 250MB vs 2GB
-    if (sizeBytes > maxBytes) {
-      throw new BadRequestException(`File too large for your role (max ${maxBytes} bytes)`);
-    }
+      // Basic size policy hook (tune later)
+      const roles: string[] = req.user?.realm_access?.roles ?? [];
+      const isPending = roles.includes('CREATOR_PENDING');
+      const maxBytes = isPending ? 250 * 1024 * 1024 : 2 * 1024 * 1024 * 1024; // 250MB vs 2GB
+      if (sizeBytes > maxBytes) {
+        throw new BadRequestException(`File too large for your role (max ${maxBytes} bytes)`);
+      }
+
+      // Daily upload quota check
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const todayUploads = await this.prisma.uploadIntent.findMany({
+        where: {
+          video: { uploaderId: user.id },
+          createdAt: { gte: startOfDay },
+          status: { in: ['INITIATED', 'UPLOADING', 'COMPLETED'] },
+        },
+      });
+
+      const uploadsTodayCount = todayUploads.length;
+      const maxUploadsPerDay = isPending ? 5 : 100;
+
+      if (uploadsTodayCount >= maxUploadsPerDay) {
+        throw new BadRequestException(`Daily upload limit reached (${maxUploadsPerDay})`);
+      }
+
+      console.log(`[${req.requestId}] uploads.init`, {
+        videoId,
+        userSub: req.user?.sub,
+        uploadsToday: uploadsTodayCount,
+        maxUploadsPerDay,
+      });
 
     const bucketName = process.env.GCS_BUCKET_ORIGINALS!;
     if (!bucketName) throw new BadRequestException('Missing GCS_BUCKET_ORIGINALS env var');

@@ -9,6 +9,12 @@ export class UploadFailController {
   @Post('uploads/:id/fail')
   @UseGuards(JwtGuard)
   async fail(@Req() req: any, @Param('id') id: string, @Body() body: { error: string; uploadedBytes?: number }) {
+    console.log(`[${req.requestId}] uploads.fail`, {
+      uploadIntentId: id,
+      error: body.error,
+      uploadedBytes: body.uploadedBytes,
+    });
+
     const sub = req.user?.sub;
     const user = await this.prisma.user.findUnique({ where: { keycloakSub: sub } });
     if (!user) throw new NotFoundException('User not found');

@@ -23,6 +23,7 @@ enum VideoStatus {
   DRAFT
   UPLOADED
   PROCESSING
+  PROCESSING_FAILED
   READY
   PENDING_APPROVAL
   APPROVED
@@ -32,10 +33,27 @@ enum VideoStatus {
   ARCHIVED
 }
 
-enum Visibility {
+enum VideoVisibility {
   PUBLIC
   UNLISTED
   PRIVATE
+}
+
+enum VideoAnalyticsEventType {
+  IMPRESSION
+  PLAY_START
+  HEARTBEAT
+  PLAY_COMPLETE
+}
+
+enum VideoTrafficSource {
+  DIRECT
+  SHARE
+  CHANNEL
+  TAG
+  SEARCH
+  EXTERNAL
+  UNKNOWN
 }
 
 enum UploadStatus {
@@ -145,10 +163,18 @@ model Video {
   id              String    @id @default(cuid())
   slug            String    @unique
   status          VideoStatus @default(DRAFT)
-  visibility      Visibility @default(PRIVATE)
+  visibility      VideoVisibility @default(PRIVATE)
   publishAt       DateTime?
+  scheduledAt     DateTime?
+  publishedAt     DateTime?
+  scheduleRequested Boolean @default(false)
   uploaderId      String?
   uploaderVisible Boolean   @default(false) // stays false until creator approved (your rule)
+  
+  // Analytics denormalized fields
+  analyticsViews      Int       @default(0)
+  analyticsCompletions Int      @default(0)
+  analyticsLastViewedAt DateTime?
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -162,6 +188,9 @@ model Video {
   asset        VideoAsset?
   thumbnails   VideoThumbnail[]
   renditions   VideoRendition[]
+  jobs         ProcessingJob[]
+  analyticsEvents VideoAnalyticsEvent[]
+  analyticsDaily  VideoAnalyticsDaily[]
 
   @@index([status])
   @@index([visibility])
@@ -250,21 +279,28 @@ model VideoAsset {
   @@index([bucket])
 }
 
-model VideoThumbnail {
-  id        String   @id @default(cuid())
-  videoId   String
-  bucket    String
-  objectKey String
-  width     Int?
-  height    Int?
-  timeSec   Float?    // timestamp used for the frame
-  isSelected Boolean  @default(false)
+enum ThumbnailSource {
+  AUTO
+  CUSTOM
+}
 
-  createdAt DateTime @default(now())
+model VideoThumbnail {
+  id          String           @id @default(cuid())
+  videoId     String
+  bucket      String
+  objectKey   String
+  width       Int?
+  height      Int?
+  timeSec     Float?          // timestamp used for the frame
+  isSelected  Boolean          @default(false)
+  source      ThumbnailSource  @default(AUTO)
+  createdAt   DateTime         @default(now())
 
   video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@index([videoId])
+  @@index([videoId, isSelected])
+  @@index([videoId, createdAt])
 }
 
 model VideoRendition {
@@ -283,4 +319,84 @@ model VideoRendition {
 
   @@index([videoId])
   @@unique([videoId, quality])
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  FAILED
+  SUCCEEDED
+}
+
+model ProcessingJob {
+  id            String    @id @default(cuid())
+  videoId       String
+  uploadIntentId String?
+  jobType       String    // "THUMBS_HLS"
+  status        JobStatus @default(PENDING)
+  attempts      Int       @default(0)
+  lastError     String?
+  correlationId String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId])
+  @@index([status])
+}
+
+model VideoAnalyticsEvent {
+  id             String                   @id @default(cuid())
+  videoId         String
+  eventType       VideoAnalyticsEventType
+  trafficSource   VideoTrafficSource      @default(UNKNOWN)
+
+  sessionId       String
+  viewerHash      String?
+  locale          String?
+
+  progressPercent Float?
+  positionSeconds Float?
+  durationSeconds Float?
+
+  referrerHost    String?
+  userAgent       String?
+  ipHash          String?
+
+  createdAt       DateTime                @default(now())
+
+  video           Video                   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId, createdAt])
+  @@index([videoId, eventType, createdAt])
+  @@index([videoId, sessionId])
+}
+
+model VideoAnalyticsDaily {
+  id               String              @id @default(cuid())
+  videoId           String
+  date              DateTime
+
+  views             Int                 @default(0)
+  uniqueViewers     Int                 @default(0)
+  playStarts        Int                 @default(0)
+  completions       Int                 @default(0)
+
+  directViews       Int                 @default(0)
+  shareViews        Int                 @default(0)
+  channelViews      Int                 @default(0)
+  tagViews          Int                 @default(0)
+  searchViews       Int                 @default(0)
+  externalViews     Int                 @default(0)
+  unknownViews      Int                 @default(0)
+
+  lastViewedAt      DateTime?
+
+  video             Video               @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, date])
+  @@index([videoId, date])
 }

@@ -3,6 +3,7 @@
 import {useTranslations} from "next-intl";
 import {useEffect, useState} from "react";
 import {useParams} from "next/navigation";
+import VideoDraftForm from "@/components/video-draft-form";
 
 export default function DashboardPage() {
   const t = useTranslations();
@@ -141,6 +142,17 @@ export default function DashboardPage() {
         </div>
       )}
 
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold">Create Draft</h2>
+        <a
+          href={`/${locale}/dashboard/uploads`}
+          className="text-sm text-blue-600 underline"
+        >
+          Bulk Upload
+        </a>
+      </div>
+      <VideoDraftForm locale={locale} />
+
       <div className="mb-4">
         <button
           className="rounded-xl border px-4 py-2 text-sm"
@@ -243,16 +255,46 @@ export default function DashboardPage() {
                 <div key={video.id} className="rounded-xl border p-4">
                   <div className="text-sm font-medium">{translation?.title || "Untitled"}</div>
                   <div className="text-xs text-muted-foreground">
-                    Status: {video.status} | Slug: {video.slug}
+                    Status: {video.status} | Visibility: {video.visibility || 'PRIVATE'} | Slug: {video.slug}
+                    {video.scheduleRequested && video.scheduledAt && (
+                      <span className="ml-2">| Scheduled: {new Date(video.scheduledAt).toLocaleString()}</span>
+                    )}
                   </div>
-                  {video.status === "READY" && (
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {["DRAFT", "UPLOADED", "PROCESSING_FAILED", "READY", "REJECTED"].includes(
+                      video.status
+                    ) && (
+                      <a
+                        href={`/${locale}/dashboard/videos/${video.id}/edit`}
+                        className="text-xs text-blue-600 underline"
+                      >
+                        Edit
+                      </a>
+                    )}
                     <a
-                      href={`/${locale}/watch/${video.id}`}
-                      className="text-xs text-blue-600 underline mt-2 inline-block"
+                      href={`/${locale}/dashboard/videos/${video.id}/analytics`}
+                      className="text-xs text-blue-600 underline"
                     >
-                      Watch
+                      Analytics
                     </a>
-                  )}
+                    {video.status === "READY" && (
+                      <a
+                        href={`/${locale}/watch/${video.id}`}
+                        className="text-xs text-blue-600 underline"
+                      >
+                        Watch
+                      </a>
+                    )}
+                    {video.status === "PUBLISHED" && (
+                      <a
+                        href={`/${locale}/v/${video.slug}`}
+                        className="text-xs text-blue-600 underline"
+                        target="_blank"
+                      >
+                        Share Page
+                      </a>
+                    )}
+                  </div>
                 </div>
               );
             })}
