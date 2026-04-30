@@ -18,20 +18,22 @@ export class UploadCompleteV2Controller {
   constructor(
     private prisma: PrismaService,
     private gcs: GcsService,
-    private pubsub: PubsubService
+    private pubsub: PubsubService,
   ) {}
 
-    @Post('uploads/:id/complete')
-    @UseGuards(JwtGuard)
-    async complete(@Req() req: any, @Param('id') uploadIntentId: string) {
-      console.log(`[${req.requestId}] uploads.complete start`, {
-        uploadIntentId,
-        userSub: req.user?.sub,
-      });
+  @Post('uploads/:id/complete')
+  @UseGuards(JwtGuard)
+  async complete(@Req() req: any, @Param('id') uploadIntentId: string) {
+    console.log(`[${req.requestId}] uploads.complete start`, {
+      uploadIntentId,
+      userSub: req.user?.sub,
+    });
 
-      const sub = req.user?.sub;
-      const user = await this.prisma.user.findUnique({ where: { keycloakSub: sub } });
-      if (!user) throw new NotFoundException('User not found');
+    const sub = req.user?.sub;
+    const user = await this.prisma.user.findUnique({
+      where: { keycloakSub: sub },
+    });
+    if (!user) throw new NotFoundException('User not found');
 
     const intent = await this.prisma.uploadIntent.findUnique({
       where: { id: uploadIntentId },
@@ -41,7 +43,11 @@ export class UploadCompleteV2Controller {
 
     const roles: string[] = req.user?.realm_access?.roles ?? [];
     const isAdmin = roles.includes('ADMIN');
-    if (!isAdmin && intent.video.uploaderId && intent.video.uploaderId !== user.id) {
+    if (
+      !isAdmin &&
+      intent.video.uploaderId &&
+      intent.video.uploaderId !== user.id
+    ) {
       throw new ForbiddenException('Not allowed');
     }
 
@@ -62,7 +68,9 @@ export class UploadCompleteV2Controller {
 
     // size check (strict)
     if (expectedSize > 0 && actualSize !== expectedSize) {
-      throw new BadRequestException(`Size mismatch. expected=${expectedSize} actual=${actualSize}`);
+      throw new BadRequestException(
+        `Size mismatch. expected=${expectedSize} actual=${actualSize}`,
+      );
     }
 
     const contentType = meta.contentType || intent.contentType;
@@ -104,31 +112,32 @@ export class UploadCompleteV2Controller {
 
     // Publish event to Pub/Sub (worker consumes Day 7)
     const topic = process.env.PUBSUB_TOPIC_VIDEO_UPLOADED!;
-    if (!topic) throw new BadRequestException('Missing PUBSUB_TOPIC_VIDEO_UPLOADED');
+    if (!topic)
+      throw new BadRequestException('Missing PUBSUB_TOPIC_VIDEO_UPLOADED');
 
-      await this.pubsub.publish(topic, {
-        type: 'video.uploaded',
-        videoId: intent.videoId,
-        uploadIntentId: intent.id,
-        bucket: intent.bucket,
-        objectKey: intent.objectKey,
-        contentType,
-        sizeBytes: actualSize,
-        occurredAt: new Date().toISOString(),
-        correlationId: req.requestId,
-      });
+    await this.pubsub.publish(topic, {
+      type: 'video.uploaded',
+      videoId: intent.videoId,
+      uploadIntentId: intent.id,
+      bucket: intent.bucket,
+      objectKey: intent.objectKey,
+      contentType,
+      sizeBytes: actualSize,
+      occurredAt: new Date().toISOString(),
+      correlationId: req.requestId,
+    });
 
-      console.log(`[${req.requestId}] uploads.complete success`, {
-        uploadIntentId: intent.id,
-        videoId: intent.videoId,
-        objectKey: intent.objectKey,
-      });
+    console.log(`[${req.requestId}] uploads.complete success`, {
+      uploadIntentId: intent.id,
+      videoId: intent.videoId,
+      objectKey: intent.objectKey,
+    });
 
-      return {
-        ok: true,
-        videoId: intent.videoId,
-        uploadIntentId: intent.id,
-        objectKey: intent.objectKey,
-      };
-    }
+    return {
+      ok: true,
+      videoId: intent.videoId,
+      uploadIntentId: intent.id,
+      objectKey: intent.objectKey,
+    };
   }
+}

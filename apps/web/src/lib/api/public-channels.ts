@@ -21,14 +21,3 @@ export async function getPublicChannelBySlug(
 
   return res.json();
 }
-
-{
-  "cells": [],
-  "metadata": {
-    "language_info": {
-      "name": "python"
-    }
-  },
-  "nbformat": 4,
-  "nbformat_minor": 2
-}

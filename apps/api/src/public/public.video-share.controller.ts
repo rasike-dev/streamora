@@ -1,14 +1,24 @@
-import { Controller, Get, NotFoundException, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PublicVideosService } from './public-videos.service';
 
 @Controller()
 export class PublicVideoShareController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private publicVideosService: PublicVideosService,
+  ) {}
 
   @Get('public/videos/:slug')
   async getBySlug(
     @Param('slug') slug: string,
-    @Query('locale') locale: string = 'en'
+    @Query('locale') locale: string = 'en',
   ) {
     const v = await this.prisma.video.findUnique({
       where: { slug },
@@ -17,11 +27,15 @@ export class PublicVideoShareController {
         uploader: true,
         channels: { include: { channel: true } },
         tags: { include: { tag: true } },
+        subtitles: true,
       },
     });
 
     if (!v) throw new NotFoundException('Video not found');
-    if (v.status !== 'PUBLISHED' || (v.visibility !== 'PUBLIC' && v.visibility !== 'UNLISTED')) {
+    if (
+      v.status !== 'PUBLISHED' ||
+      (v.visibility !== 'PUBLIC' && v.visibility !== 'UNLISTED')
+    ) {
       throw new NotFoundException('Video not found');
     }
 
@@ -50,15 +64,27 @@ export class PublicVideoShareController {
       }
     }
 
+    const cdnBase =
+      process.env.CDN_BASE_URL || process.env.PUBLIC_ASSET_BASE_URL;
     const masterUrl =
       asset?.hlsBucket && asset?.hlsMasterKey
-        ? `https://storage.googleapis.com/${asset.hlsBucket}/${asset.hlsMasterKey}`
+        ? cdnBase
+          ? `${cdnBase}/${asset.hlsMasterKey}`
+          : `https://storage.googleapis.com/${asset.hlsBucket}/${asset.hlsMasterKey}`
         : null;
 
-    const thumbUrl =
-      thumb
-        ? `https://storage.googleapis.com/${thumb.bucket}/${thumb.objectKey}`
-        : null;
+    const thumbUrl = thumb
+      ? cdnBase
+        ? `${cdnBase}/${thumb.objectKey}`
+        : `https://storage.googleapis.com/${thumb.bucket}/${thumb.objectKey}`
+      : null;
+
+    const subtitles = v.subtitles.map((sub) => ({
+      locale: sub.locale,
+      url: cdnBase
+        ? `${cdnBase}/${sub.objectKey}`
+        : `https://storage.googleapis.com/${sub.bucket}/${sub.objectKey}`,
+    }));
 
     return {
       id: v.id,
@@ -79,6 +105,15 @@ export class PublicVideoShareController {
         slug: x.tag.slug,
         name: x.tag.name,
       })),
+      subtitles,
     };
+  }
+
+  @Get('public/videos/:slug/embed')
+  async getEmbedVideo(
+    @Param('slug') slug: string,
+    @Query('locale') locale: string = 'en',
+  ) {
+    return this.publicVideosService.getPublicEmbedVideoBySlug(slug, locale);
   }
 }

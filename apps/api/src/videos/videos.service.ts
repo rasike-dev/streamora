@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatorVideosQueryService } from './creator-videos-query.service';
 
@@ -9,14 +14,18 @@ export class VideosService {
     private queryService: CreatorVideosQueryService,
   ) {}
 
-  async createDraft(keycloakSub: string, data: {
-    locale: string;
-    title?: string;
-    description?: string;
-    tagline?: string;
-    channelIds?: string[];
-    tagIds?: string[];
-  }, requestId?: string) {
+  async createDraft(
+    keycloakSub: string,
+    data: {
+      locale: string;
+      title?: string;
+      description?: string;
+      tagline?: string;
+      channelIds?: string[];
+      tagIds?: string[];
+    },
+    requestId?: string,
+  ) {
     if (requestId) {
       console.log(`[${requestId}] creator.videos.draft.create start`, {
         keycloakSub,
@@ -77,14 +86,18 @@ export class VideosService {
     return video;
   }
 
-  async updateDraft(videoId: string, keycloakSub: string, data: {
-    locale?: string;
-    title?: string;
-    description?: string;
-    tagline?: string;
-    channelIds?: string[];
-    tagIds?: string[];
-  }) {
+  async updateDraft(
+    videoId: string,
+    keycloakSub: string,
+    data: {
+      locale?: string;
+      title?: string;
+      description?: string;
+      tagline?: string;
+      channelIds?: string[];
+      tagIds?: string[];
+    },
+  ) {
     // Find user
     const user = await this.prisma.user.findUnique({
       where: { keycloakSub },
@@ -206,7 +219,28 @@ export class VideosService {
         id: videoId,
         uploaderId: user.id,
       },
-      include: {
+      select: {
+        id: true,
+        slug: true,
+        status: true,
+        visibility: true,
+        scheduledAt: true,
+        scheduleRequested: true,
+        rejectionReason: true,
+        rejectionNote: true,
+        rejectedAt: true,
+        resubmittedAt: true,
+        moderationVersion: true,
+        takedownReason: true,
+        takedownNote: true,
+        takenDownAt: true,
+        takenDownBy: true,
+        archivedReason: true,
+        archivedNote: true,
+        archivedAt: true,
+        archivedBy: true,
+        createdAt: true,
+        updatedAt: true,
         translations: true,
         channels: { include: { channel: true } },
         tags: { include: { tag: true } },
@@ -233,7 +267,7 @@ export class VideosService {
       }>;
       channels?: string[];
       tags?: string[];
-    }
+    },
   ) {
     const user = await this.prisma.user.findUnique({
       where: { keycloakSub },
@@ -252,7 +286,13 @@ export class VideosService {
     }
 
     // Check if video is editable
-    const editable = ['DRAFT', 'UPLOADED', 'PROCESSING_FAILED', 'READY', 'REJECTED'];
+    const editable = [
+      'DRAFT',
+      'UPLOADED',
+      'PROCESSING_FAILED',
+      'READY',
+      'REJECTED',
+    ];
     if (!editable.includes(video.status)) {
       throw new BadRequestException('Video not editable in current status');
     }
@@ -357,7 +397,9 @@ export class VideosService {
 
     // Only allow submission from READY status
     if (video.status !== 'READY') {
-      throw new BadRequestException('Video must be READY to submit for moderation');
+      throw new BadRequestException(
+        'Video must be READY to submit for moderation',
+      );
     }
 
     await this.prisma.video.update({
@@ -370,20 +412,80 @@ export class VideosService {
     return { success: true, videoId, status: 'PENDING_APPROVAL' };
   }
 
+  async resubmitVideo(videoId: string, keycloakSub: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { keycloakSub },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const video = await this.prisma.video.findFirst({
+      where: { id: videoId, uploaderId: user.id },
+      select: {
+        id: true,
+        uploaderId: true,
+        status: true,
+        moderationVersion: true,
+      },
+    });
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    if (video.uploaderId !== user.id) {
+      throw new ForbiddenException('You cannot resubmit this video');
+    }
+
+    if (video.status !== 'REJECTED') {
+      throw new BadRequestException('Only rejected videos can be resubmitted');
+    }
+
+    const updated = await this.prisma.video.update({
+      where: { id: videoId },
+      data: {
+        status: 'PENDING_APPROVAL',
+        resubmittedAt: new Date(),
+        moderationVersion: {
+          increment: 1,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        resubmittedAt: true,
+        moderationVersion: true,
+      },
+    });
+
+    return {
+      id: updated.id,
+      status: updated.status,
+      resubmittedAt: updated.resubmittedAt?.toISOString() ?? null,
+      moderationVersion: updated.moderationVersion,
+      message: 'Video resubmitted for moderation',
+    };
+  }
+
   async getUserByKeycloakSub(keycloakSub: string) {
     return this.prisma.user.findUnique({
       where: { keycloakSub },
     });
   }
 
-  async queryMine(userId: string, opts: {
-    locale: string;
-    q?: string;
-    status?: string;
-    visibility?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
+  async queryMine(
+    userId: string,
+    opts: {
+      locale: string;
+      q?: string;
+      status?: string;
+      visibility?: string;
+      page?: number;
+      pageSize?: number;
+    },
+  ) {
     return this.queryService.listMine(userId, opts);
   }
 }

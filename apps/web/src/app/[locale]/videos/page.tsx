@@ -92,8 +92,17 @@ export default async function VideosPage({ params, searchParams }: Props) {
 
       <section>
         {data.items.length === 0 ? (
-          <div className="rounded-2xl border bg-white p-6 text-sm text-gray-600 shadow-sm">
-            No videos matched your search.
+          <div className="rounded-2xl border bg-white p-6 text-center shadow-sm">
+            <p className="text-sm font-medium text-gray-900">
+              {q || channel || tag
+                ? `No videos matched ${q ? `"${q}"` : 'your search'}.`
+                : 'No videos found.'}
+            </p>
+            <p className="mt-2 text-sm text-gray-600">
+              {q || channel || tag
+                ? 'Try a different keyword, channel, or tag.'
+                : 'Check back later for new content.'}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">

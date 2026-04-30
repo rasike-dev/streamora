@@ -1,8 +1,20 @@
-import { Controller, Get, Post, Param, UseGuards, Query, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  UseGuards,
+  Query,
+  BadRequestException,
+  NotFoundException,
+  Req,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { RejectVideoDto } from './dto/reject-video.dto';
 
 @Controller()
 @UseGuards(JwtGuard, RolesGuard)
@@ -12,8 +24,16 @@ export class AdminModerationController {
 
   @Get('admin/moderation/queue')
   async queue(@Query('status') status: string = 'PENDING_APPROVAL') {
-    const allowed = ['PENDING_APPROVAL', 'REJECTED', 'APPROVED'];
-    if (!allowed.includes(status)) throw new BadRequestException('Invalid status');
+    const allowed = [
+      'PENDING_APPROVAL',
+      'REJECTED',
+      'APPROVED',
+      'PUBLISHED',
+      'TAKEDOWN',
+      'ARCHIVED',
+    ];
+    if (!allowed.includes(status))
+      throw new BadRequestException('Invalid status');
 
     const rows = await this.prisma.video.findMany({
       where: { status: status as any },
@@ -30,6 +50,12 @@ export class AdminModerationController {
       uploaderName: v.uploader?.displayName || v.uploader?.username || null,
       createdAt: v.createdAt,
       status: v.status,
+      rejectionReason:
+        v.status === 'REJECTED' ? (v as any).rejectionReason : null,
+      moderationVersion: (v as any).moderationVersion ?? 1,
+      resubmittedAt: (v as any).resubmittedAt
+        ? (v as any).resubmittedAt.toISOString()
+        : null,
     }));
   }
 
@@ -54,16 +80,15 @@ export class AdminModerationController {
     // If scheduled time has passed, publish immediately
     // Otherwise, set to APPROVED and wait for scheduler
     const nextStatus =
-      video.scheduledAt && video.scheduledAt <= now
-        ? 'PUBLISHED'
-        : 'APPROVED';
+      video.scheduledAt && video.scheduledAt <= now ? 'PUBLISHED' : 'APPROVED';
 
     const v = await this.prisma.video.update({
       where: { id },
       data: {
         status: nextStatus,
         publishedAt: nextStatus === 'PUBLISHED' ? now : null,
-        scheduleRequested: nextStatus === 'PUBLISHED' ? false : video.scheduleRequested,
+        scheduleRequested:
+          nextStatus === 'PUBLISHED' ? false : video.scheduleRequested,
       },
     });
 
@@ -71,10 +96,57 @@ export class AdminModerationController {
   }
 
   @Post('admin/videos/:id/reject')
-  async reject(@Param('id') id: string) {
+  async reject(
+    @Param('id') id: string,
+    @Body() body: RejectVideoDto,
+    @Req() req: any,
+  ) {
+    // Validate request body
+    if (
+      !body.reason ||
+      typeof body.reason !== 'string' ||
+      body.reason.trim().length === 0
+    ) {
+      throw new BadRequestException('Rejection reason is required');
+    }
+
+    if (body.reason.length > 500) {
+      throw new BadRequestException(
+        'Rejection reason must be 500 characters or less',
+      );
+    }
+
+    if (body.note && body.note.length > 2000) {
+      throw new BadRequestException(
+        'Rejection note must be 2000 characters or less',
+      );
+    }
+
+    const video = await this.prisma.video.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    if (video.status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException('Only pending videos can be rejected');
+    }
+
     const v = await this.prisma.video.update({
       where: { id },
-      data: { status: 'REJECTED' },
+      data: {
+        status: 'REJECTED',
+        rejectionReason: body.reason.trim(),
+        rejectionNote: body.note?.trim() ?? null,
+        rejectedAt: new Date(),
+        rejectedBy: req.user.sub || req.user.id,
+      },
     });
 
     return { ok: true, id: v.id, status: v.status };

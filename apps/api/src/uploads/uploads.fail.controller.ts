@@ -1,4 +1,13 @@
-import { Body, Controller, Param, Post, Req, UseGuards, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { JwtGuard } from '../auth/jwt.guard';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -8,7 +17,11 @@ export class UploadFailController {
 
   @Post('uploads/:id/fail')
   @UseGuards(JwtGuard)
-  async fail(@Req() req: any, @Param('id') id: string, @Body() body: { error: string; uploadedBytes?: number }) {
+  async fail(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { error: string; uploadedBytes?: number },
+  ) {
     console.log(`[${req.requestId}] uploads.fail`, {
       uploadIntentId: id,
       error: body.error,
@@ -16,7 +29,9 @@ export class UploadFailController {
     });
 
     const sub = req.user?.sub;
-    const user = await this.prisma.user.findUnique({ where: { keycloakSub: sub } });
+    const user = await this.prisma.user.findUnique({
+      where: { keycloakSub: sub },
+    });
     if (!user) throw new NotFoundException('User not found');
 
     const intent = await this.prisma.uploadIntent.findUnique({
@@ -28,7 +43,11 @@ export class UploadFailController {
     const roles: string[] = req.user?.realm_access?.roles ?? [];
     const isAdmin = roles.includes('ADMIN');
 
-    if (!isAdmin && intent.video.uploaderId && intent.video.uploaderId !== user.id) {
+    if (
+      !isAdmin &&
+      intent.video.uploaderId &&
+      intent.video.uploaderId !== user.id
+    ) {
       throw new ForbiddenException('Not allowed');
     }
 

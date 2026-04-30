@@ -1,4 +1,11 @@
-import { Body, Controller, Post, Req, UseGuards, BadRequestException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  Req,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { GcsService } from '../storage/gcs.service';
@@ -15,27 +22,41 @@ function safeExt(filename: string) {
 export class UploadsController {
   constructor(
     private prisma: PrismaService,
-    private gcs: GcsService
+    private gcs: GcsService,
   ) {}
 
   @Post('uploads/init')
   @UseGuards(JwtGuard)
   async initUpload(
     @Req() req: any,
-    @Body() body: { videoId: string; filename: string; contentType: string; sizeBytes: number; uploadIntentId?: string }
+    @Body()
+    body: {
+      videoId: string;
+      filename: string;
+      contentType: string;
+      sizeBytes: number;
+      uploadIntentId?: string;
+    },
   ) {
     const { videoId, filename, contentType, sizeBytes } = body;
 
     if (!videoId || !filename || !contentType || !sizeBytes) {
-      throw new BadRequestException('videoId, filename, contentType, sizeBytes are required');
+      throw new BadRequestException(
+        'videoId, filename, contentType, sizeBytes are required',
+      );
     }
 
     // Ensure video exists and user owns it (creator-side)
     const userSub = req.user?.sub;
-    const user = await this.prisma.user.findUnique({ where: { keycloakSub: userSub } });
-    if (!user) throw new BadRequestException('User not found in DB (call /me first)');
+    const user = await this.prisma.user.findUnique({
+      where: { keycloakSub: userSub },
+    });
+    if (!user)
+      throw new BadRequestException('User not found in DB (call /me first)');
 
-    const video = await this.prisma.video.findUnique({ where: { id: videoId } });
+    const video = await this.prisma.video.findUnique({
+      where: { id: videoId },
+    });
     if (!video) throw new BadRequestException('Video not found');
 
     // Ownership check: either uploaderId is null (draft not yet assigned) or matches
@@ -43,42 +64,47 @@ export class UploadsController {
       throw new BadRequestException('Not owner of this video');
     }
 
-      // Basic size policy hook (tune later)
-      const roles: string[] = req.user?.realm_access?.roles ?? [];
-      const isPending = roles.includes('CREATOR_PENDING');
-      const maxBytes = isPending ? 250 * 1024 * 1024 : 2 * 1024 * 1024 * 1024; // 250MB vs 2GB
-      if (sizeBytes > maxBytes) {
-        throw new BadRequestException(`File too large for your role (max ${maxBytes} bytes)`);
-      }
+    // Basic size policy hook (tune later)
+    const roles: string[] = req.user?.realm_access?.roles ?? [];
+    const isPending = roles.includes('CREATOR_PENDING');
+    const maxBytes = isPending ? 250 * 1024 * 1024 : 2 * 1024 * 1024 * 1024; // 250MB vs 2GB
+    if (sizeBytes > maxBytes) {
+      throw new BadRequestException(
+        `File too large for your role (max ${maxBytes} bytes)`,
+      );
+    }
 
-      // Daily upload quota check
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
+    // Daily upload quota check
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
 
-      const todayUploads = await this.prisma.uploadIntent.findMany({
-        where: {
-          video: { uploaderId: user.id },
-          createdAt: { gte: startOfDay },
-          status: { in: ['INITIATED', 'UPLOADING', 'COMPLETED'] },
-        },
-      });
+    const todayUploads = await this.prisma.uploadIntent.findMany({
+      where: {
+        video: { uploaderId: user.id },
+        createdAt: { gte: startOfDay },
+        status: { in: ['INITIATED', 'UPLOADING', 'COMPLETED'] },
+      },
+    });
 
-      const uploadsTodayCount = todayUploads.length;
-      const maxUploadsPerDay = isPending ? 5 : 100;
+    const uploadsTodayCount = todayUploads.length;
+    const maxUploadsPerDay = isPending ? 5 : 100;
 
-      if (uploadsTodayCount >= maxUploadsPerDay) {
-        throw new BadRequestException(`Daily upload limit reached (${maxUploadsPerDay})`);
-      }
+    if (uploadsTodayCount >= maxUploadsPerDay) {
+      throw new BadRequestException(
+        `Daily upload limit reached (${maxUploadsPerDay})`,
+      );
+    }
 
-      console.log(`[${req.requestId}] uploads.init`, {
-        videoId,
-        userSub: req.user?.sub,
-        uploadsToday: uploadsTodayCount,
-        maxUploadsPerDay,
-      });
+    console.log(`[${req.requestId}] uploads.init`, {
+      videoId,
+      userSub: req.user?.sub,
+      uploadsToday: uploadsTodayCount,
+      maxUploadsPerDay,
+    });
 
     const bucketName = process.env.GCS_BUCKET_ORIGINALS!;
-    if (!bucketName) throw new BadRequestException('Missing GCS_BUCKET_ORIGINALS env var');
+    if (!bucketName)
+      throw new BadRequestException('Missing GCS_BUCKET_ORIGINALS env var');
 
     let objectKey: string;
     let intentId: string | undefined;
@@ -90,8 +116,10 @@ export class UploadsController {
         include: { video: true },
       });
       if (!existing) throw new BadRequestException('uploadIntentId not found');
-      if (existing.videoId !== videoId) throw new BadRequestException('uploadIntentId does not match videoId');
-      if (existing.status === 'COMPLETED') throw new BadRequestException('Upload already completed');
+      if (existing.videoId !== videoId)
+        throw new BadRequestException('uploadIntentId does not match videoId');
+      if (existing.status === 'COMPLETED')
+        throw new BadRequestException('Upload already completed');
       // ownership already ensured by video check; but double-check:
       if (existing.video.uploaderId && existing.video.uploaderId !== user.id) {
         throw new BadRequestException('Not owner of this upload');

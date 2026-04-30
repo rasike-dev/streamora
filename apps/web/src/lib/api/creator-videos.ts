@@ -32,3 +32,28 @@ export async function getCreatorVideos(params: {
 
   return res.json();
 }
+
+export async function resubmitCreatorVideo(videoId: string) {
+  const api = process.env.NEXT_PUBLIC_API_URL!;
+  const token = localStorage.getItem('access_token');
+
+  if (!token) {
+    throw new Error('Not authenticated');
+  }
+
+  const res = await fetch(`${api}/creator/videos/${videoId}/resubmit`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message || 'Failed to resubmit video');
+  }
+
+  return res.json();
+}

@@ -106,6 +106,7 @@ export default async function VideoSharePage({ params, searchParams }: PageProps
         posterUrl={video.thumbnailUrl}
         locale={locale}
         trafficSource={trafficSource as any}
+        subtitles={video.subtitles || []}
       />
 
       {video.description && (
@@ -120,6 +121,8 @@ export default async function VideoSharePage({ params, searchParams }: PageProps
         tagline={video.tagline || ""}
         description={video.description || ""}
         shareUrl={shareUrl}
+        locale={locale}
+        slug={video.slug}
       />
 
       {(video.channels?.length > 0 || video.tags?.length > 0) && (

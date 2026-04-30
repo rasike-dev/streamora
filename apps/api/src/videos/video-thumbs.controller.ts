@@ -10,8 +10,12 @@ export class VideoThumbsController {
   @UseGuards(JwtGuard)
   async thumbs(@Req() req: any, @Param('id') videoId: string) {
     const sub = req.user?.sub;
-    const user = await this.prisma.user.findUnique({ where: { keycloakSub: sub } });
-    const video = await this.prisma.video.findUnique({ where: { id: videoId } });
+    const user = await this.prisma.user.findUnique({
+      where: { keycloakSub: sub },
+    });
+    const video = await this.prisma.video.findUnique({
+      where: { id: videoId },
+    });
 
     if (!user || !video || video.uploaderId !== user.id) return [];
 

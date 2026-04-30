@@ -7,7 +7,10 @@
     "dev:web": "pnpm --filter web dev",
     "dev:api": "pnpm --filter api start:dev",
     "dev:worker": "pnpm --filter worker dev",
-    "dev": "concurrently -n WEB,API,WORKER \"pnpm dev:web\" \"pnpm dev:api\" \"pnpm dev:worker\""
+    "dev": "concurrently -n WEB,API,WORKER \"pnpm dev:web\" \"pnpm dev:api\" \"pnpm dev:worker\"",
+    "lint": "pnpm --filter api lint:check && pnpm --filter web lint",
+    "build": "pnpm --filter api exec prisma generate && pnpm --filter api build && pnpm --filter web build && pnpm --filter worker build",
+    "test": "pnpm --filter api test"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

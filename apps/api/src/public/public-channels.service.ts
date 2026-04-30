@@ -6,8 +6,9 @@ export class PublicChannelsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private toPublicUrl(bucket: string, objectKey: string) {
-    const base = process.env.PUBLIC_ASSET_BASE_URL;
-    if (base) return `${base}/${objectKey}`;
+    const cdnBase =
+      process.env.CDN_BASE_URL || process.env.PUBLIC_ASSET_BASE_URL;
+    if (cdnBase) return `${cdnBase}/${objectKey}`;
     return `https://storage.googleapis.com/${bucket}/${objectKey}`;
   }
 
@@ -59,10 +60,7 @@ export class PublicChannelsService {
         where,
         skip,
         take: pageSize,
-        orderBy: [
-          { publishedAt: 'desc' },
-          { createdAt: 'desc' },
-        ],
+        orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
         include: {
           translations: {
             where: {

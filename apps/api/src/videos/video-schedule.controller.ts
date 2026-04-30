@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Param,
-  Patch,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Param, Patch, Req, UseGuards } from '@nestjs/common';
 import { JwtGuard } from '../auth/jwt.guard';
 import { CreatorVideoScheduleService } from './video-schedule.service';
 import { UpdateVideoScheduleDto } from './dto/update-video-schedule.dto';
@@ -13,9 +6,7 @@ import { UpdateVideoScheduleDto } from './dto/update-video-schedule.dto';
 @Controller('creator/videos')
 @UseGuards(JwtGuard)
 export class CreatorVideoScheduleController {
-  constructor(
-    private readonly scheduleService: CreatorVideoScheduleService,
-  ) {}
+  constructor(private readonly scheduleService: CreatorVideoScheduleService) {}
 
   @Patch(':id/schedule')
   async updateSchedule(

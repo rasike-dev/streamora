@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -31,11 +28,13 @@ export class CreatorVideoAnalyticsService {
     }
 
     const now = new Date();
-    const from = new Date(Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() - Math.max(1, days) + 1,
-    ));
+    const from = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() - Math.max(1, days) + 1,
+      ),
+    );
 
     const rows = await this.prisma.videoAnalyticsDaily.findMany({
       where: {
@@ -86,7 +85,9 @@ export class CreatorVideoAnalyticsService {
         completions: totals.completions,
         completionRate:
           totals.playStarts > 0
-            ? Number(((totals.completions / totals.playStarts) * 100).toFixed(2))
+            ? Number(
+                ((totals.completions / totals.playStarts) * 100).toFixed(2),
+              )
             : 0,
       },
       trafficSources: {

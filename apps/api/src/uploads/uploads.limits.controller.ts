@@ -12,7 +12,12 @@ export class UploadLimitsController {
     return {
       maxBytes: isPending ? 250 * 1024 * 1024 : 2 * 1024 * 1024 * 1024,
       maxDailyMinutes: isPending ? 30 : 500, // placeholder; enforce later
-      allowedTypes: ['video/mp4', 'video/webm', 'video/quicktime', 'application/octet-stream'],
+      allowedTypes: [
+        'video/mp4',
+        'video/webm',
+        'video/quicktime',
+        'application/octet-stream',
+      ],
     };
   }
 }

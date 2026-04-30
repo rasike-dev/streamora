@@ -30,19 +30,33 @@ import { PublicVideoBySlugController } from './public/public.video-by-slug.contr
 import { PublicVideoShareController } from './public/public.video-share.controller';
 import { PublicChannelsController } from './public/public-channels.controller';
 import { PublicChannelsService } from './public/public-channels.service';
+import { PublicTagsController } from './public/public-tags.controller';
+import { PublicTagsService } from './public/public-tags.service';
 import { PublicVideosService } from './public/public-videos.service';
 import { CreatorVideosQueryService } from './videos/creator-videos-query.service';
 import { PublicVideoAnalyticsController } from './public/public-video-analytics.controller';
 import { PublicVideoAnalyticsService } from './public/public-video-analytics.service';
 import { CreatorVideoAnalyticsController } from './videos/creator-video-analytics.controller';
 import { CreatorVideoAnalyticsService } from './videos/creator-video-analytics.service';
+import { CreatorAnalyticsController } from './videos/creator-analytics.controller';
+import { CreatorAnalyticsService } from './videos/creator-analytics.service';
+import { ShortLinksController } from './short-links/short-links.controller';
+import { ShortLinksService } from './short-links/short-links.service';
+import { VideoSubtitlesController } from './videos/video-subtitles.controller';
+import { VideoSubtitlesService } from './videos/video-subtitles.service';
 import { AdminModerationController } from './admin/admin.moderation.controller';
+import { AdminGovernanceController } from './admin/admin-governance.controller';
 import { AdminUsersController } from './admin/admin.users.controller';
 import { AdminChannelsController } from './admin/admin.channels.controller';
 import { AdminTagsController } from './admin/admin.tags.controller';
 import { AdminJobsController } from './admin/admin.jobs.controller';
+import { AdminGovernanceService } from './admin/admin-governance.service';
+import { SearchModule } from './search/search.module';
+import { HealthController } from './health/health.controller';
 import { GcsService } from './storage/gcs.service';
 import { PubsubService } from './events/pubsub.service';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { rateLimitConfig } from './common/rate-limit.config';
 
 @Module({
   imports: [
@@ -51,11 +65,13 @@ import { PubsubService } from './events/pubsub.service';
       isGlobal: true,
     }),
     ScheduleModule.forRoot(),
+    ThrottlerModule.forRoot(rateLimitConfig),
     PrismaModule,
     AuthModule,
     ChannelsModule,
     TagsModule,
     VideosModule,
+    SearchModule,
   ],
   controllers: [
     AppController,
@@ -76,15 +92,38 @@ import { PubsubService } from './events/pubsub.service';
     PublicVideoBySlugController,
     PublicVideoShareController,
     PublicChannelsController,
+    PublicTagsController,
     PublicVideoAnalyticsController,
     CreatorVideoAnalyticsController,
+    CreatorAnalyticsController,
+    ShortLinksController,
+    VideoSubtitlesController,
     AdminModerationController,
+    AdminGovernanceController,
     AdminUsersController,
     AdminChannelsController,
     AdminTagsController,
     AdminJobsController,
+    HealthController,
   ],
-  providers: [GcsService, PubsubService, CreatorVideoThumbnailsService, CreatorVideoVisibilityService, CreatorVideoScheduleService, ScheduledPublisherService, PublicChannelsService, PublicVideosService, CreatorVideosQueryService, PublicVideoAnalyticsService, CreatorVideoAnalyticsService],
+  providers: [
+    GcsService,
+    PubsubService,
+    CreatorVideoThumbnailsService,
+    CreatorVideoVisibilityService,
+    CreatorVideoScheduleService,
+    ScheduledPublisherService,
+    PublicChannelsService,
+    PublicTagsService,
+    PublicVideosService,
+    CreatorVideosQueryService,
+    PublicVideoAnalyticsService,
+    CreatorVideoAnalyticsService,
+    CreatorAnalyticsService,
+    ShortLinksService,
+    AdminGovernanceService,
+    VideoSubtitlesService,
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

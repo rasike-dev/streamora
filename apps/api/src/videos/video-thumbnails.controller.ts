@@ -23,7 +23,9 @@ interface UploadedFile {
 @Controller('creator/videos/:id/thumbnails')
 @UseGuards(JwtGuard)
 export class CreatorVideoThumbnailsController {
-  constructor(private readonly thumbnailsService: CreatorVideoThumbnailsService) {}
+  constructor(
+    private readonly thumbnailsService: CreatorVideoThumbnailsService,
+  ) {}
 
   @Get()
   async list(@Param('id') videoId: string, @Req() req: any) {

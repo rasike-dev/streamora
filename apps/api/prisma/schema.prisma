@@ -76,6 +76,7 @@ model User {
   roles         UserRole[]
   creatorProfile CreatorProfile?
   videos        Video[] @relation("UploaderVideos")
+  shortLinks    ShortLink[]
 
   @@index([keycloakSub])
 }
@@ -148,10 +149,11 @@ model Tag {
 }
 
 model TagTranslation {
-  id     String @id @default(cuid())
-  tagId  String
-  locale String
-  name   String
+  id          String   @id @default(cuid())
+  tagId       String
+  locale      String
+  name        String
+  description String?
 
   tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
@@ -170,6 +172,24 @@ model Video {
   scheduleRequested Boolean @default(false)
   uploaderId      String?
   uploaderVisible Boolean   @default(false) // stays false until creator approved (your rule)
+  
+  // Moderation fields
+  rejectionReason String?
+  rejectionNote   String?
+  rejectedAt      DateTime?
+  rejectedBy      String?
+  resubmittedAt   DateTime?
+  moderationVersion Int      @default(1)
+  
+  // Governance fields
+  takedownReason  String?
+  takedownNote    String?
+  takenDownAt     DateTime?
+  takenDownBy     String?
+  archivedReason  String?
+  archivedNote    String?
+  archivedAt      DateTime?
+  archivedBy      String?
   
   // Analytics denormalized fields
   analyticsViews      Int       @default(0)
@@ -191,6 +211,9 @@ model Video {
   jobs         ProcessingJob[]
   analyticsEvents VideoAnalyticsEvent[]
   analyticsDaily  VideoAnalyticsDaily[]
+  shortLinks      ShortLink[]
+  auditLogs       VideoAuditLog[]
+  subtitles       VideoSubtitle[]
 
   @@index([status])
   @@index([visibility])
@@ -399,4 +422,66 @@ model VideoAnalyticsDaily {
 
   @@unique([videoId, date])
   @@index([videoId, date])
+}
+
+model ShortLink {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  videoId         String
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  video           Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  createdByUser   User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([videoId])
+  @@index([code])
+}
+
+enum VideoAuditAction {
+  VIDEO_CREATED
+  VIDEO_SUBMITTED
+  VIDEO_APPROVED
+  VIDEO_REJECTED
+  VIDEO_RESUBMITTED
+  VIDEO_PUBLISHED
+  VIDEO_TAKEDOWN
+  VIDEO_ARCHIVED
+  VIDEO_RESTORED
+}
+
+model VideoAuditLog {
+  id          String           @id @default(cuid())
+  videoId     String
+  action      VideoAuditAction
+  actorUserId String
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+
+  video       Video            @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId, createdAt])
+  @@index([action, createdAt])
+}
+
+enum SubtitleFormat {
+  VTT
+  SRT
+}
+
+model VideoSubtitle {
+  id         String         @id @default(cuid())
+  videoId    String
+  locale     String
+  format     SubtitleFormat @default(VTT)
+  bucket     String
+  objectKey  String
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  video      Video         @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, locale])
+  @@index([videoId])
 }

@@ -1,24 +1,32 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SearchService } from '../search/search.service';
 
 @Injectable()
 export class CreatorVideosQueryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly searchService: SearchService,
+  ) {}
 
   private toPublicUrl(bucket: string, objectKey: string) {
-    const base = process.env.PUBLIC_ASSET_BASE_URL;
-    if (base) return `${base}/${objectKey}`;
+    const cdnBase =
+      process.env.CDN_BASE_URL || process.env.PUBLIC_ASSET_BASE_URL;
+    if (cdnBase) return `${cdnBase}/${objectKey}`;
     return `https://storage.googleapis.com/${bucket}/${objectKey}`;
   }
 
-  async listMine(userId: string, opts: {
-    locale: string;
-    q?: string;
-    status?: string;
-    visibility?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
+  async listMine(
+    userId: string,
+    opts: {
+      locale: string;
+      q?: string;
+      status?: string;
+      visibility?: string;
+      page?: number;
+      pageSize?: number;
+    },
+  ) {
     const locale = opts.locale || 'en';
     const q = opts.q?.trim();
     const page = Math.max(1, opts.page || 1);
@@ -37,6 +45,33 @@ export class CreatorVideosQueryService {
       where.visibility = opts.visibility;
     }
 
+    // Use ranked search if query exists and is at least 2 characters
+    if (q && q.length >= 2) {
+      const searchResult = await this.searchService.searchCreatorVideos({
+        userId,
+        locale,
+        q,
+        status: opts.status,
+        visibility: opts.visibility,
+        page,
+        pageSize,
+      });
+
+      if (searchResult) {
+        return {
+          filters: {
+            q: q ?? '',
+            status: opts.status ?? null,
+            visibility: opts.visibility ?? null,
+          },
+          pagination: searchResult.pagination,
+          searchMeta: searchResult.searchMeta,
+          items: searchResult.items,
+        };
+      }
+    }
+
+    // Fallback to normal listing
     if (q) {
       where.translations = {
         some: {
@@ -82,6 +117,10 @@ export class CreatorVideosQueryService {
         pageSize,
         total,
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
+      searchMeta: {
+        query: q ?? '',
+        mode: 'listing' as const,
       },
       items: items.map((video) => {
         const translation =

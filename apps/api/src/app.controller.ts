@@ -1,4 +1,10 @@
-import { Controller, Get, Req, UseGuards, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Req,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtGuard } from './auth/jwt.guard';
 import { Roles } from './auth/roles.decorator';
 import { RolesGuard } from './auth/roles.guard';
@@ -62,8 +68,12 @@ export class AppController {
     });
 
     const existingRoleNames = existingRoles.map((r) => r.role);
-    const rolesToAdd = keycloakRoles.filter((r: string) => !existingRoleNames.includes(r));
-    const rolesToRemove = existingRoleNames.filter((r) => !keycloakRoles.includes(r));
+    const rolesToAdd = keycloakRoles.filter(
+      (r: string) => !existingRoleNames.includes(r),
+    );
+    const rolesToRemove = existingRoleNames.filter(
+      (r) => !keycloakRoles.includes(r),
+    );
 
     // Add new roles
     if (rolesToAdd.length > 0) {

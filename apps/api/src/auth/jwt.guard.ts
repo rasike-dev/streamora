@@ -1,11 +1,19 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 
-const issuer = process.env.KEYCLOAK_ISSUER || 'http://localhost:8080/realms/streamora';
+const issuer =
+  process.env.KEYCLOAK_ISSUER || 'http://localhost:8080/realms/streamora';
 const audience = process.env.KEYCLOAK_AUDIENCE || 'streamora-web';
 
 // JWKS endpoint auto-derived from issuer
-const jwks = createRemoteJWKSet(new URL(`${issuer}/protocol/openid-connect/certs`));
+const jwks = createRemoteJWKSet(
+  new URL(`${issuer}/protocol/openid-connect/certs`),
+);
 
 @Injectable()
 export class JwtGuard implements CanActivate {
@@ -43,7 +51,7 @@ export class JwtGuard implements CanActivate {
         tokenPreview: token.substring(0, 50) + '...',
       });
       throw new UnauthorizedException(
-        `Invalid token: ${e instanceof Error ? e.message : String(e)}`
+        `Invalid token: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
   }

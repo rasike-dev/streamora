@@ -1,4 +1,11 @@
-import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -18,7 +25,7 @@ export class AdminTagsController {
       slug: string;
       preferred?: boolean;
       translations?: { locale: string; name: string }[];
-    }
+    },
   ) {
     const tag = await this.prisma.tag.create({
       data: {
@@ -51,7 +58,7 @@ export class AdminTagsController {
       slug?: string;
       preferred?: boolean;
       translations?: { locale: string; name: string }[];
-    }
+    },
   ) {
     const tag = await this.prisma.tag.update({
       where: { id },

@@ -45,7 +45,9 @@ export class CreatorVideoScheduleService {
     }
 
     if (!SCHEDULE_EDITABLE_STATUSES.includes(video.status)) {
-      throw new BadRequestException('Video schedule is not editable in current status');
+      throw new BadRequestException(
+        'Video schedule is not editable in current status',
+      );
     }
 
     let parsedDate: Date | null = null;

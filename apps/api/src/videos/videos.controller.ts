@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Patch, Post, Req, UseGuards, Param, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { JwtGuard } from '../auth/jwt.guard';
 import { VideosService } from './videos.service';
 import { UpdateVideoDraftDto } from './dto/update-video-draft.dto';
@@ -21,7 +31,11 @@ export class VideosController {
   }
 
   @Patch(':id')
-  async updateDraft(@Req() req: any, @Param('id') id: string, @Body() body: UpdateVideoDraftDto | any) {
+  async updateDraft(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: UpdateVideoDraftDto | any,
+  ) {
     const keycloakSub = req.user.sub;
     // Support both old format (for backward compatibility) and new format
     if (body.translations || body.channels || body.tags) {
@@ -35,6 +49,12 @@ export class VideosController {
   async submitForModeration(@Req() req: any, @Param('id') id: string) {
     const keycloakSub = req.user.sub;
     return this.videosService.submitForModeration(id, keycloakSub);
+  }
+
+  @Post(':id/resubmit')
+  async resubmitVideo(@Req() req: any, @Param('id') id: string) {
+    const keycloakSub = req.user.sub;
+    return this.videosService.resubmitVideo(id, keycloakSub);
   }
 
   @Get()

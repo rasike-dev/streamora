@@ -48,7 +48,9 @@ export class CreatorVideoVisibilityService {
     }
 
     if (!VISIBILITY_EDITABLE_STATUSES.includes(video.status)) {
-      throw new BadRequestException('Video visibility is not editable in current status');
+      throw new BadRequestException(
+        'Video visibility is not editable in current status',
+      );
     }
 
     const updated = await this.prisma.video.update({

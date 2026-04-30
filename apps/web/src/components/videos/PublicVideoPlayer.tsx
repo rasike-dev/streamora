@@ -4,12 +4,18 @@ import { useEffect, useRef } from "react";
 import Hls from "hls.js";
 import { trackVideoEvent, VideoTrafficSource } from "@/lib/analytics/video-analytics";
 
+type SubtitleTrack = {
+  locale: string;
+  url: string;
+};
+
 type Props = {
   videoId: string;
   playbackUrl: string;
   posterUrl?: string | null;
   locale: string;
   trafficSource: VideoTrafficSource;
+  subtitles?: SubtitleTrack[];
 };
 
 export function PublicVideoPlayer({
@@ -18,6 +24,7 @@ export function PublicVideoPlayer({
   posterUrl,
   locale,
   trafficSource,
+  subtitles = [],
 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const startedRef = useRef(false);
@@ -126,6 +133,17 @@ export function PublicVideoPlayer({
       playsInline
       poster={posterUrl ?? undefined}
       className="w-full rounded-2xl bg-black"
-    />
+    >
+      {subtitles.map((track) => (
+        <track
+          key={track.locale}
+          src={track.url}
+          kind="subtitles"
+          srcLang={track.locale}
+          label={track.locale.toUpperCase()}
+          default={track.locale === locale}
+        />
+      ))}
+    </video>
   );
 }

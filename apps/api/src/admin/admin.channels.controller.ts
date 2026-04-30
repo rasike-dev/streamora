@@ -1,4 +1,11 @@
-import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -18,7 +25,7 @@ export class AdminChannelsController {
       slug: string;
       sortOrder?: number;
       translations?: { locale: string; name: string; description?: string }[];
-    }
+    },
   ) {
     const channel = await this.prisma.channel.create({
       data: {
@@ -53,7 +60,7 @@ export class AdminChannelsController {
       isActive?: boolean;
       sortOrder?: number;
       translations?: { locale: string; name: string; description?: string }[];
-    }
+    },
   ) {
     const channel = await this.prisma.channel.update({
       where: { id },

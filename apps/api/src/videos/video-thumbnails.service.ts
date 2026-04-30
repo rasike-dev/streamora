@@ -21,7 +21,8 @@ export class CreatorVideoThumbnailsService {
   private readonly storage = new Storage({
     projectId: process.env.GCP_PROJECT_ID,
   });
-  private readonly thumbnailsBucket = process.env.GCS_BUCKET_THUMBNAILS || process.env.GCS_BUCKET_ORIGINALS!;
+  private readonly thumbnailsBucket =
+    process.env.GCS_BUCKET_THUMBNAILS || process.env.GCS_BUCKET_ORIGINALS!;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -46,15 +47,18 @@ export class CreatorVideoThumbnailsService {
     }
 
     if (!THUMBNAIL_EDITABLE_STATUSES.includes(video.status)) {
-      throw new BadRequestException('Video thumbnails are not editable in current status');
+      throw new BadRequestException(
+        'Video thumbnails are not editable in current status',
+      );
     }
 
     return video;
   }
 
   private toPublicUrl(bucket: string, objectKey: string) {
-    const base = process.env.PUBLIC_ASSET_BASE_URL;
-    if (base) return `${base}/${objectKey}`;
+    const cdnBase =
+      process.env.CDN_BASE_URL || process.env.PUBLIC_ASSET_BASE_URL;
+    if (cdnBase) return `${cdnBase}/${objectKey}`;
     return `https://storage.googleapis.com/${bucket}/${objectKey}`;
   }
 
@@ -110,21 +114,28 @@ export class CreatorVideoThumbnailsService {
   async uploadCustom(
     videoId: string,
     keycloakSub: string,
-    file: { buffer: Buffer; mimetype: string; size: number; originalname?: string },
+    file: {
+      buffer: Buffer;
+      mimetype: string;
+      size: number;
+      originalname?: string;
+    },
   ) {
     await this.getOwnedVideo(videoId, keycloakSub);
 
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedMimeTypes.includes(file.mimetype)) {
-      throw new BadRequestException('Only JPEG, PNG, and WebP thumbnails are allowed');
+      throw new BadRequestException(
+        'Only JPEG, PNG, and WebP thumbnails are allowed',
+      );
     }
 
     const extension =
       file.mimetype === 'image/png'
         ? 'png'
         : file.mimetype === 'image/webp'
-        ? 'webp'
-        : 'jpg';
+          ? 'webp'
+          : 'jpg';
 
     const objectKey = `videos/${videoId}/thumbnails/custom/${randomUUID()}.${extension}`;
 

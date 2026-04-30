@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { PublicVideosService } from './public-videos.service';
 
 @Controller('videos')
@@ -22,5 +22,13 @@ export class PublicVideosController {
       page: Number(page),
       pageSize: Number(pageSize),
     });
+  }
+
+  @Get(':slug/embed')
+  async getEmbedVideo(
+    @Param('slug') slug: string,
+    @Query('locale') locale = 'en',
+  ) {
+    return this.publicVideosService.getPublicEmbedVideoBySlug(slug, locale);
   }
 }

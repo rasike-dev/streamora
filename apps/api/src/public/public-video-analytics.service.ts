@@ -1,12 +1,6 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  VideoAnalyticsEventType,
-  VideoTrafficSource,
-} from '@prisma/client';
+import { VideoAnalyticsEventType, VideoTrafficSource } from '@prisma/client';
 import { createHash } from 'crypto';
 
 @Injectable()
@@ -19,7 +13,9 @@ export class PublicVideoAnalyticsService {
   }
 
   private getUtcDateOnly(date = new Date()) {
-    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+    );
   }
 
   async trackEvent(videoId: string, dto: any, req: any) {
@@ -72,7 +68,8 @@ export class PublicVideoAnalyticsService {
           })
         : null;
 
-    const isFirstUniqueStartToday = dto.eventType === 'PLAY_START' && !existingUniqueForDay;
+    const isFirstUniqueStartToday =
+      dto.eventType === 'PLAY_START' && !existingUniqueForDay;
 
     // Check for existing completion for this session/day
     const existingCompletion =
@@ -91,15 +88,15 @@ export class PublicVideoAnalyticsService {
           })
         : null;
 
-    const isNewCompletion = dto.eventType === 'PLAY_COMPLETE' && !existingCompletion;
+    const isNewCompletion =
+      dto.eventType === 'PLAY_COMPLETE' && !existingCompletion;
 
     // Create raw event
     await this.prisma.videoAnalyticsEvent.create({
       data: {
         videoId,
         eventType: dto.eventType as VideoAnalyticsEventType,
-        trafficSource: (dto.trafficSource ||
-          'UNKNOWN') as VideoTrafficSource,
+        trafficSource: (dto.trafficSource || 'UNKNOWN') as VideoTrafficSource,
         sessionId: dto.sessionId,
         viewerHash,
         ipHash,
@@ -123,8 +120,9 @@ export class PublicVideoAnalyticsService {
 
     // Update aggregates for PLAY_START
     if (dto.eventType === 'PLAY_START') {
-      const trafficSource = (dto.trafficSource || 'UNKNOWN') as VideoTrafficSource;
-      
+      const trafficSource = (dto.trafficSource ||
+        'UNKNOWN') as VideoTrafficSource;
+
       await this.prisma.$transaction([
         this.prisma.videoAnalyticsDaily.upsert({
           where: {
@@ -136,15 +134,29 @@ export class PublicVideoAnalyticsService {
           update: {
             views: { increment: 1 },
             playStarts: { increment: 1 },
-            uniqueViewers: isFirstUniqueStartToday ? { increment: 1 } : undefined,
+            uniqueViewers: isFirstUniqueStartToday
+              ? { increment: 1 }
+              : undefined,
             lastViewedAt: now,
-            ...(trafficSource === 'DIRECT' ? { directViews: { increment: 1 } } : {}),
-            ...(trafficSource === 'SHARE' ? { shareViews: { increment: 1 } } : {}),
-            ...(trafficSource === 'CHANNEL' ? { channelViews: { increment: 1 } } : {}),
+            ...(trafficSource === 'DIRECT'
+              ? { directViews: { increment: 1 } }
+              : {}),
+            ...(trafficSource === 'SHARE'
+              ? { shareViews: { increment: 1 } }
+              : {}),
+            ...(trafficSource === 'CHANNEL'
+              ? { channelViews: { increment: 1 } }
+              : {}),
             ...(trafficSource === 'TAG' ? { tagViews: { increment: 1 } } : {}),
-            ...(trafficSource === 'SEARCH' ? { searchViews: { increment: 1 } } : {}),
-            ...(trafficSource === 'EXTERNAL' ? { externalViews: { increment: 1 } } : {}),
-            ...(trafficSource === 'UNKNOWN' ? { unknownViews: { increment: 1 } } : {}),
+            ...(trafficSource === 'SEARCH'
+              ? { searchViews: { increment: 1 } }
+              : {}),
+            ...(trafficSource === 'EXTERNAL'
+              ? { externalViews: { increment: 1 } }
+              : {}),
+            ...(trafficSource === 'UNKNOWN'
+              ? { unknownViews: { increment: 1 } }
+              : {}),
           },
           create: {
             videoId,

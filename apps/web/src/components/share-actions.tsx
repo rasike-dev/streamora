@@ -1,17 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { CopyEmbedCodeButton } from "./CopyEmbedCodeButton";
 
 export default function ShareActions({
   title,
   tagline,
   description,
   shareUrl,
+  locale,
+  slug,
 }: {
   title: string;
   tagline: string;
   description: string;
   shareUrl: string;
+  locale?: string;
+  slug?: string;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -92,6 +97,12 @@ export default function ShareActions({
           Copy Caption
         </button>
       </div>
+
+      {locale && slug && (
+        <div>
+          <CopyEmbedCodeButton locale={locale} slug={slug} />
+        </div>
+      )}
 
       <div className="space-y-2">
         <div className="text-xs text-muted-foreground break-all">{shareUrl}</div>

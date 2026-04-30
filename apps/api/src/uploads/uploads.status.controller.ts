@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Req, UseGuards, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Req,
+  UseGuards,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { JwtGuard } from '../auth/jwt.guard';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -10,7 +18,9 @@ export class UploadStatusController {
   @UseGuards(JwtGuard)
   async status(@Req() req: any, @Param('id') id: string) {
     const sub = req.user?.sub;
-    const user = await this.prisma.user.findUnique({ where: { keycloakSub: sub } });
+    const user = await this.prisma.user.findUnique({
+      where: { keycloakSub: sub },
+    });
     if (!user) throw new NotFoundException('User not found');
 
     const intent = await this.prisma.uploadIntent.findUnique({
@@ -23,7 +33,11 @@ export class UploadStatusController {
     const roles: string[] = req.user?.realm_access?.roles ?? [];
     const isAdmin = roles.includes('ADMIN');
 
-    if (!isAdmin && intent.video.uploaderId && intent.video.uploaderId !== user.id) {
+    if (
+      !isAdmin &&
+      intent.video.uploaderId &&
+      intent.video.uploaderId !== user.id
+    ) {
       throw new ForbiddenException('Not allowed');
     }
 
@@ -36,9 +50,12 @@ export class UploadStatusController {
       contentType: intent.contentType,
       sizeBytes: intent.sizeBytes.toString(),
       uploadedBytes: intent.uploadedBytes.toString(),
-      percent: Number(intent.sizeBytes) > 0
-        ? Math.floor((Number(intent.uploadedBytes) / Number(intent.sizeBytes)) * 100)
-        : 0,
+      percent:
+        Number(intent.sizeBytes) > 0
+          ? Math.floor(
+              (Number(intent.uploadedBytes) / Number(intent.sizeBytes)) * 100,
+            )
+          : 0,
       lastError: intent.lastError,
       startedAt: intent.startedAt,
       completedAt: intent.completedAt,
