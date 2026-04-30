@@ -10,6 +10,10 @@ Subscription error: StatusError: User not authorized to perform this action.
 
 The service account (or user account) being used doesn't have the required Pub/Sub permissions to pull messages from the subscription.
 
+### `Subscriber` vs `GetSubscription` (worker startup check)
+
+Pulling messages uses **`pubsub.subscriptions.consume`** (covered by **`roles/pubsub.subscriber`**). The optional **`subscription.exists()`** check calls **`pubsub.subscriptions.get`**, which often requires **`roles/pubsub.viewer`** (or Editor) in addition to Subscriber. If you granted Subscriber only, you may see **`PERMISSION_DENIED`** on that check even though pulls would work. The Streamora worker treats that case as non-fatal and still starts the pull; add Viewer on the subscription if you want the existence check to succeed.
+
 ## Solution
 
 ### Step 1: Identify What Credentials Are Being Used
@@ -35,7 +39,6 @@ If using a service account:
    # From the JSON file
    cat $GOOGLE_APPLICATION_CREDENTIALS | grep client_email
    ```
-
 2. **Grant Pub/Sub Subscriber role**:
    ```bash
    # Replace SERVICE_ACCOUNT_EMAIL with your actual service account email

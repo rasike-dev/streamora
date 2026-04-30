@@ -39,6 +39,8 @@
     "@nestjs/throttler": "^6.5.0",
     "@prisma/client": "5.19.1",
     "@streamora/shared": "workspace:*",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
     "jose": "^5.9.6",
     "jwks-rsa": "^3.1.0",
     "passport": "^0.7.0",

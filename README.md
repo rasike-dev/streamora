@@ -20,6 +20,7 @@ pnpm install
 ```bash
 cp .env.example .env
 cp apps/web/.env.example apps/web/.env.local
+cp apps/worker/.env.example apps/worker/.env
 ```
 Edit `.env` and `apps/web/.env.local` if your ports or Keycloak realm/client names differ. The API resolves `DATABASE_URL` and related vars from the **repository root** `.env` (see `apps/api` `ConfigModule` `envFilePath`). The web app uses **`apps/web/.env.local`** for `NEXT_PUBLIC_*` variables.
 
@@ -52,7 +53,33 @@ pnpm --filter api exec dotenv -e ../../.env -- prisma db seed
 pnpm dev
 ```
 
-**Worker:** `dotenv/config` loads **`apps/worker/.env`** when you run `pnpm dev:worker`. Symlink or copy the root env file if you want one source of truth, for example from the repo root: `ln -sf ../../.env apps/worker/.env` (or copy `.env` into `apps/worker/.env` on Windows).
+**Worker:** `dotenv/config` loads **`apps/worker/.env`** when you run `pnpm dev:worker`. Copy [`apps/worker/.env.example`](apps/worker/.env.example) to `apps/worker/.env`, or symlink the root `.env`, for example from the repo root: `ln -sf ../../.env apps/worker/.env` (or copy `.env` into `apps/worker/.env` on Windows).
+
+**Worker and GCP:** The worker pulls **`PUBSUB_SUBSCRIPTION_VIDEO_UPLOADED`** from Google Cloud Pub/Sub. If that subscription does not exist in **`GCP_PROJECT_ID`**, you will see `Resource not found`. Enable Pub/Sub and create the topic plus subscription (names must match your `.env`), for example:
+
+```bash
+export PROJECT_ID=your-gcp-project-id
+gcloud services enable pubsub.googleapis.com --project="$PROJECT_ID"
+gcloud pubsub topics create video.uploaded --project="$PROJECT_ID"
+gcloud pubsub subscriptions create video-uploaded-dev-sub \
+  --topic=video.uploaded \
+  --project="$PROJECT_ID"
+```
+
+Use Application Default Credentials (`gcloud auth application-default login`) or **`GOOGLE_APPLICATION_CREDENTIALS`**. The API must publish to the same topic (**`PUBSUB_TOPIC_VIDEO_UPLOADED`**). Extended steps: [`docs/day7-setup.md`](docs/day7-setup.md).
+
+If the worker logs **`PERMISSION_DENIED`** / **code 7**, the signed-in user or service account needs **`roles/pubsub.subscriber`** on that subscription (ADC identity must match who you grant):
+
+```bash
+export PROJECT_ID=your-gcp-project-id
+export SUB=video-uploaded-dev-sub
+gcloud pubsub subscriptions add-iam-policy-binding "$SUB" \
+  --project="$PROJECT_ID" \
+  --member="user:$(gcloud config get-value account)" \
+  --role="roles/pubsub.subscriber"
+```
+
+For a service account key used as **`GOOGLE_APPLICATION_CREDENTIALS`**, use `--member="serviceAccount:NAME@${PROJECT_ID}.iam.gserviceaccount.com"` instead. Put **`GOOGLE_APPLICATION_CREDENTIALS`** in **`apps/worker/.env`** as an **absolute path** to that JSON; the file’s **`client_email`** must be the same principal you granted **`roles/pubsub.subscriber`**. See [`docs/day7-pubsub-permissions.md`](docs/day7-pubsub-permissions.md).
 
 ### Running Apps Separately
 

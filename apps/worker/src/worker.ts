@@ -1,12 +1,16 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "path";
 import { PubSub } from "@google-cloud/pubsub";
 import { Storage } from "@google-cloud/storage";
 import { PrismaClient } from "@prisma/client";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";
-import path from "path";
+import { readFileSync } from "fs";
 import os from "os";
+
+/** Load apps/worker/.env before GCP clients are constructed (cwd-independent). */
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 const execFileAsync = promisify(execFile);
 
@@ -362,11 +366,112 @@ async function processMessage(evt: VideoUploadedEvent) {
   await fs.rm(tmpDir, { recursive: true, force: true });
 }
 
+function logIdentityFromCredentialsFile() {
+  const p = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (!p) return;
+  try {
+    const j = JSON.parse(readFileSync(p, "utf8")) as { client_email?: string };
+    if (j.client_email) {
+      console.log(`GCP identity from key file: ${j.client_email}`);
+    }
+  } catch {
+    console.warn(
+      `Could not read client_email from GOOGLE_APPLICATION_CREDENTIALS (${p})`,
+    );
+  }
+}
+
+function printPubSubSubscriberDeniedHelp(projectId: string, subName: string) {
+  const creds = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  const credsHint = creds
+    ? `GOOGLE_APPLICATION_CREDENTIALS is set (…/${path.basename(creds)}). The "client_email" in that JSON must match the principal you granted Subscriber on the subscription.`
+    : `GOOGLE_APPLICATION_CREDENTIALS is NOT set — Node is using Application Default Credentials (usually your user from "gcloud auth application-default login"), NOT your streamora-uploader key. Either run "gcloud auth application-default login" as a user who has Subscriber, or set GOOGLE_APPLICATION_CREDENTIALS to the JSON key for the service account you granted (absolute path recommended).`;
+
+  console.error(`
+Pub/Sub PERMISSION_DENIED while pulling from subscription "${subName}" in project ${projectId}.
+
+${credsHint}
+
+Grant roles/pubsub.subscriber on that subscription for this identity (same member as in your key file):
+
+   gcloud pubsub subscriptions add-iam-policy-binding ${subName} \\
+     --project=${projectId} \\
+     --member="serviceAccount:YOUR_SA@${projectId}.iam.gserviceaccount.com" \\
+     --role="roles/pubsub.subscriber"
+
+Optional metadata checks use subscription.exists(), which needs pubsub.subscriptions.get — run a second binding:
+
+   gcloud pubsub subscriptions add-iam-policy-binding ${subName} \\
+     --project=${projectId} \\
+     --member="serviceAccount:YOUR_SA@${projectId}.iam.gserviceaccount.com" \\
+     --role="roles/pubsub.viewer"
+
+More detail: docs/day7-pubsub-permissions.md
+`);
+}
+
+/** subscription.exists() calls GetSubscription (subscriptions.get). Subscriber-only IAM may lack that permission while StreamingPull still works. */
+async function verifySubscriptionExistsBestEffort(
+  subscription: ReturnType<PubSub["subscription"]>,
+): Promise<boolean> {
+  try {
+    const [exists] = await subscription.exists();
+    return exists;
+  } catch (err: any) {
+    if (err?.code === 7 || /PERMISSION_DENIED/i.test(String(err?.message))) {
+      console.warn(
+        [
+          "Pub/Sub: subscription.exists() denied (needs pubsub.subscriptions.get).",
+          "If this identity has roles/pubsub.subscriber only, that is expected.",
+          "Starting message pull anyway. Grant roles/pubsub.viewer on the subscription to enable the existence check.",
+        ].join(" "),
+      );
+      return true;
+    }
+    throw err;
+  }
+}
+
 async function main() {
+  logIdentityFromCredentialsFile();
+
+  const projectId = mustEnv("GCP_PROJECT_ID");
   const subName = mustEnv("PUBSUB_SUBSCRIPTION_VIDEO_UPLOADED");
   const subscription = pubsub.subscription(subName);
 
+  const subExists = await verifySubscriptionExistsBestEffort(subscription);
+
+  if (!subExists) {
+    const topicHint =
+      process.env.PUBSUB_TOPIC_VIDEO_UPLOADED || "video.uploaded";
+    console.error(`
+Pub/Sub subscription not found: "${subName}" (project: ${projectId})
+
+Create the topic and subscription in that project, then restart the worker:
+
+  gcloud services enable pubsub.googleapis.com --project=${projectId}
+
+  gcloud pubsub topics create ${topicHint} --project=${projectId}
+
+  gcloud pubsub subscriptions create ${subName} \\
+    --topic=${topicHint} \\
+    --project=${projectId}
+
+Confirm names match apps/worker/.env (or symlinked root .env):
+  PUBSUB_SUBSCRIPTION_VIDEO_UPLOADED=${subName}
+  (API should use the same topic in PUBSUB_TOPIC_VIDEO_UPLOADED.)
+
+More detail: docs/day7-setup.md
+`);
+    process.exit(1);
+  }
+
   console.log(`Streamora Worker Day07 listening on subscription: ${subName}`);
+  console.log(
+    process.env.GOOGLE_APPLICATION_CREDENTIALS
+      ? `GCP auth: GOOGLE_APPLICATION_CREDENTIALS=${process.env.GOOGLE_APPLICATION_CREDENTIALS}`
+      : "GCP auth: Application Default Credentials (no GOOGLE_APPLICATION_CREDENTIALS)",
+  );
 
   subscription.on("message", async (message) => {
     try {
@@ -400,8 +505,11 @@ async function main() {
     }
   });
 
-  subscription.on("error", (e) => {
+  subscription.on("error", (e: any) => {
     console.error("Subscription error:", e);
+    if (e?.code === 7 || /PERMISSION_DENIED/i.test(String(e?.message))) {
+      printPubSubSubscriberDeniedHelp(projectId, subName);
+    }
   });
 }
 
