@@ -1,10 +1,26 @@
-import { UploadManager } from "@/components/upload-manager";
+import { getTranslations } from 'next-intl/server';
+import { PageFrame, PageHeading } from '@/components/layout';
+import { UploadManager } from '@/components/upload-manager';
 
-export default function UploadPage({ params }: { params: { locale: string } }) {
+type PageProps = {
+  params: Promise<{ locale: string }>;
+};
+
+export default async function UploadPage({ params }: PageProps) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'uploadPage' });
+  const tCommon = await getTranslations({ locale, namespace: 'common' });
+
   return (
-    <main className="min-h-dvh p-4">
-      <h1 className="text-xl font-semibold mb-4">Upload</h1>
-      <UploadManager locale={params.locale} />
-    </main>
+    <PageFrame>
+      <PageHeading
+        title={t('title')}
+        description={t('description')}
+        backHref={`/${locale}/dashboard`}
+        backLabel={tCommon('backToDashboard')}
+      />
+      <p className="-mt-2 mb-6 text-sm text-muted-foreground">{t('intro')}</p>
+      <UploadManager locale={locale} />
+    </PageFrame>
   );
 }

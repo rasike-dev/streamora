@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import Image from "next/image";
+import { useRef, useState, useEffect, useCallback } from "react";
 import {
   getVideoThumbnails,
   selectVideoThumbnail,
@@ -34,7 +35,7 @@ export function ThumbnailPicker({ locale, videoId }: Props) {
   const [uploading, setUploading] = useState(false);
   const [selecting, setSelecting] = useState<string | null>(null);
 
-  const loadThumbnails = async () => {
+  const loadThumbnails = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -45,11 +46,11 @@ export function ThumbnailPicker({ locale, videoId }: Props) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [videoId]);
 
   useEffect(() => {
     loadThumbnails();
-  }, [videoId]);
+  }, [loadThumbnails]);
 
   const handleSelect = async (thumbnailId: string) => {
     try {
@@ -155,9 +156,12 @@ export function ThumbnailPicker({ locale, videoId }: Props) {
                 disabled={isSelecting || active}
               >
                 <div className="aspect-video w-full bg-gray-100 dark:bg-gray-800">
-                  <img
+                  <Image
                     src={item.url}
                     alt="Thumbnail preview"
+                    width={640}
+                    height={360}
+                    unoptimized
                     className="h-full w-full object-cover"
                   />
                 </div>

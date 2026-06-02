@@ -1,3 +1,5 @@
+import { apiFetch } from "../api";
+
 export type CreatorAnalyticsOverview = {
   rangeDays: number;
   totals: {
@@ -40,22 +42,19 @@ export async function getCreatorAnalyticsOverview(
   days: 7 | 30,
   locale: string = 'en',
 ): Promise<CreatorAnalyticsOverview> {
-  const api = process.env.NEXT_PUBLIC_API_URL!;
-  const token = localStorage.getItem('access_token');
-
-  const res = await fetch(
-    `${api}/creator/analytics/overview?days=${days}&locale=${locale}`,
+  const res = await apiFetch(
+    `/creator/analytics/overview?days=${days}&locale=${locale}`,
     {
       credentials: 'include',
       cache: 'no-store',
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
     },
   );
 
   if (!res.ok) {
-    throw new Error('Failed to fetch creator analytics overview');
+    if (res.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error('FETCH_FAILED');
   }
 
   return res.json();

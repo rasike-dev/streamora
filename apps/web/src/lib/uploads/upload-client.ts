@@ -1,4 +1,5 @@
 import { apiFetch } from "../api";
+import { getValidAccessToken } from "../auth/tokens";
 
 export interface InitUploadResponse {
   uploadIntentId: string;
@@ -9,8 +10,7 @@ export interface InitUploadResponse {
 }
 
 export async function initUpload(file: File, videoId?: string): Promise<InitUploadResponse> {
-  const token = localStorage.getItem("access_token");
-  if (!token) {
+  if (!(await getValidAccessToken())) {
     throw new Error("Not authenticated");
   }
 
@@ -59,11 +59,6 @@ export async function initUpload(file: File, videoId?: string): Promise<InitUplo
 }
 
 export async function completeUpload(uploadIntentId: string) {
-  const token = localStorage.getItem("access_token");
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
-
   const res = await apiFetch(`/uploads/${uploadIntentId}/complete`, {
     method: "POST",
   });
@@ -77,11 +72,6 @@ export async function completeUpload(uploadIntentId: string) {
 }
 
 export async function failUpload(uploadIntentId: string, error: string) {
-  const token = localStorage.getItem("access_token");
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
-
   await apiFetch(`/uploads/${uploadIntentId}/fail`, {
     method: "POST",
     headers: {
@@ -94,11 +84,6 @@ export async function failUpload(uploadIntentId: string, error: string) {
 }
 
 export async function getUploadStatus(uploadIntentId: string) {
-  const token = localStorage.getItem("access_token");
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
-
   const res = await apiFetch(`/uploads/${uploadIntentId}/status`, {
     method: "GET",
   });

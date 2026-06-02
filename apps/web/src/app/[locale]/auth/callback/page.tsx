@@ -1,9 +1,27 @@
 "use client";
 
-import {useEffect, useState} from "react";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import {
+  PageFrame,
+  PageHeading,
+  UserBanner,
+} from "@/components/layout";
+import { setTokens } from "@/lib/auth/tokens";
+
+type CallbackStatus = "loading" | "success" | "error";
+
+type ErrorKind = "invalid_state" | "token_exchange" | "no_access_token" | null;
 
 export default function CallbackPage() {
-  const [msg, setMsg] = useState("Completing login...");
+  const params = useParams();
+  const locale = (params.locale as string) || "en";
+  const t = useTranslations("authCallback");
+  const tCommon = useTranslations("common");
+  const [status, setStatus] = useState<CallbackStatus>("loading");
+  const [errorKind, setErrorKind] = useState<ErrorKind>(null);
+  const [tokenStatus, setTokenStatus] = useState<string | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -11,16 +29,14 @@ export default function CallbackPage() {
       const clientId = process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID!;
       const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
 
-      // Extract locale from pathname
-      const locale = window.location.pathname.split("/")[1] || "en";
-
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-      const state = params.get("state");
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get("code");
+      const state = searchParams.get("state");
 
       const expectedState = sessionStorage.getItem("kc_state");
       if (!code || !state || state !== expectedState) {
-        setMsg("Login failed: invalid state.");
+        setErrorKind("invalid_state");
+        setStatus("error");
         return;
       }
 
@@ -34,43 +50,90 @@ export default function CallbackPage() {
 
       const res = await fetch(tokenUrl, {
         method: "POST",
-        headers: {"Content-Type": "application/x-www-form-urlencoded"},
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body,
       });
 
       if (!res.ok) {
         const errorText = await res.text();
-        setMsg(`Login failed: token exchange error. Status: ${res.status}`);
         console.error("Token exchange error:", {
           status: res.status,
           statusText: res.statusText,
           error: errorText,
         });
+        setErrorKind("token_exchange");
+        setTokenStatus(String(res.status));
+        setStatus("error");
         return;
       }
 
       const data = await res.json();
       if (!data.access_token) {
-        setMsg("Login failed: no access token in response.");
         console.error("Token response:", data);
+        setErrorKind("no_access_token");
+        setStatus("error");
         return;
       }
 
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token || "");
-      console.log("Token stored successfully");
+      setTokens(data.access_token, data.refresh_token || "");
 
-      setMsg("Login complete. Redirecting...");
+      // Ensure backend user/profile and roles are provisioned for this token.
+      const api = process.env.NEXT_PUBLIC_API_URL!;
+      await fetch(`${api}/me`, {
+        headers: {
+          Authorization: `Bearer ${data.access_token}`,
+        },
+      }).catch(() => {
+        // Non-blocking: dashboard handles temporary API issues with retry UI.
+      });
+
+      setStatus("success");
       window.location.href = `/${locale}/dashboard`;
     };
 
     run();
-  }, []);
+  }, [locale]);
+
+  const errorBody =
+    errorKind === "token_exchange" && tokenStatus
+      ? t("tokenExchangeFailed", { status: tokenStatus })
+      : errorKind === "invalid_state"
+        ? t("invalidState")
+        : errorKind === "no_access_token"
+          ? t("noAccessToken")
+          : t("errorBody");
 
   return (
-    <main className="min-h-dvh p-4">
-      <h1 className="text-xl font-semibold mb-2">Auth Callback</h1>
-      <p className="text-sm text-muted-foreground">{msg}</p>
-    </main>
+    <PageFrame>
+      <PageHeading title={tCommon("login")} />
+
+      {status === "loading" ? (
+        <UserBanner variant="info" title={t("processing")} />
+      ) : null}
+
+      {status === "success" ? (
+        <UserBanner
+          variant="success"
+          title={t("successTitle")}
+          body={t("successBody")}
+        />
+      ) : null}
+
+      {status === "error" ? (
+        <UserBanner
+          variant="error"
+          title={t("errorTitle")}
+          body={errorBody}
+          primaryAction={{
+            href: `/${locale}/login`,
+            label: t("tryAgain"),
+          }}
+          secondaryAction={{
+            href: `/${locale}`,
+            label: t("goHome"),
+          }}
+        />
+      ) : null}
+    </PageFrame>
   );
 }

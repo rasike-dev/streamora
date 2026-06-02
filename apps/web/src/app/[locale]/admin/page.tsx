@@ -1,34 +1,131 @@
 "use client";
 
-import {useTranslations} from "next-intl";
-import {useParams} from "next/navigation";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { useParams } from "next/navigation";
+import { PageFrame, PageHeading, UserBanner } from "@/components/layout";
+import { apiFetch } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth/tokens";
 
 export default function AdminPage() {
-  const t = useTranslations();
+  const tAdmin = useTranslations("adminHub");
+  const tCommon = useTranslations("common");
+  const tErrors = useTranslations("errors");
+  const tNav = useTranslations("nav");
   const params = useParams();
   const locale = (params.locale as string) || "en";
+  const [access, setAccess] = useState<
+    "loading" | "allowed" | "unauthorized" | "forbidden" | "network"
+  >("loading");
+
+  useEffect(() => {
+    const validateAdminAccess = async () => {
+      if (!getAccessToken()) {
+        setAccess("unauthorized");
+        return;
+      }
+
+      try {
+        const res = await apiFetch(`/admin/jobs`, {
+          cache: "no-store",
+        });
+
+        if (res.ok) {
+          setAccess("allowed");
+          return;
+        }
+
+        if (res.status === 401) {
+          setAccess("unauthorized");
+          return;
+        }
+
+        if (res.status === 403) {
+          setAccess("forbidden");
+          return;
+        }
+
+        setAccess("network");
+      } catch {
+        setAccess("network");
+      }
+    };
+
+    validateAdminAccess();
+  }, []);
+
+  const tile =
+    "block rounded-xl border border-black/10 bg-black/[0.02] p-4 transition hover:bg-black/[0.04] dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.06]";
 
   return (
-    <main className="min-h-dvh p-4 space-y-4">
-      <h1 className="text-xl font-semibold mb-2">{t("nav.admin")}</h1>
-      
-      <div className="space-y-3">
-        <Link
-          href={`/${locale}/admin/moderation`}
-          className="block rounded-xl border p-4 hover:bg-gray-50 dark:hover:bg-gray-800"
-        >
-          <div className="text-sm font-medium">Moderation Queue</div>
-          <div className="text-xs text-muted-foreground">Review and approve pending videos</div>
-        </Link>
-        <Link
-          href={`/${locale}/admin/jobs`}
-          className="block rounded-xl border p-4 hover:bg-gray-50 dark:hover:bg-gray-800"
-        >
-          <div className="text-sm font-medium">Failed Jobs</div>
-          <div className="text-xs text-muted-foreground">View processing failures and errors</div>
-        </Link>
-      </div>
-    </main>
+    <PageFrame>
+      <PageHeading
+        title={tAdmin("title")}
+        description={tAdmin("description")}
+        backHref={`/${locale}`}
+        backLabel={tCommon("backToHome")}
+      />
+
+      {access === "loading" ? (
+        <p className="text-sm text-muted-foreground">{tCommon("loading")}</p>
+      ) : access === "unauthorized" ? (
+        <UserBanner
+          variant="warning"
+          title={tErrors("unauthorized")}
+          body={tAdmin("needSignIn")}
+          primaryAction={{
+            href: `/${locale}/login`,
+            label: tNav("login"),
+          }}
+          secondaryAction={{
+            href: `/${locale}`,
+            label: tCommon("home"),
+          }}
+        />
+      ) : access === "forbidden" ? (
+        <UserBanner
+          variant="error"
+          title={tAdmin("forbidden")}
+          primaryAction={{
+            href: `/${locale}/dashboard`,
+            label: tCommon("dashboard"),
+          }}
+          secondaryAction={{
+            href: `/${locale}`,
+            label: tCommon("home"),
+          }}
+        />
+      ) : access === "network" ? (
+        <UserBanner
+          variant="error"
+          title={tErrors("generic")}
+          body={tErrors("network")}
+          primaryAction={{
+            href: `/${locale}/admin`,
+            label: tCommon("retry"),
+          }}
+          secondaryAction={{
+            href: `/${locale}`,
+            label: tCommon("home"),
+          }}
+        />
+      ) : (
+        <div className="space-y-3">
+          <Link href={`/${locale}/admin/moderation`} className={tile}>
+            <div className="text-sm font-medium">{tAdmin("moderation")}</div>
+            <div className="text-xs text-muted-foreground">
+              {tAdmin("moderationDescription")}
+            </div>
+          </Link>
+          <Link href={`/${locale}/admin/jobs`} className={tile}>
+            <div className="text-sm font-medium">{tAdmin("jobs")}</div>
+            <div className="text-xs text-muted-foreground">
+              {tAdmin("jobsDescription")}
+            </div>
+          </Link>
+        </div>
+      )}
+    </PageFrame>
   );
 }

@@ -12,10 +12,10 @@ import { UploadsController } from './uploads/uploads.controller';
 import { UploadLimitsController } from './uploads/uploads.limits.controller';
 import { UploadStatusController } from './uploads/uploads.status.controller';
 import { UploadProgressController } from './uploads/uploads.progress.controller';
-import { UploadCompleteController } from './uploads/uploads.complete.controller';
 import { UploadFailController } from './uploads/uploads.fail.controller';
 import { CreatorUploadsController } from './uploads/uploads.creator.controller';
 import { UploadCompleteV2Controller } from './uploads/uploads.complete-v2.controller';
+import { VideoReprocessController } from './uploads/uploads.reprocess.controller';
 import { VideoThumbsController } from './videos/video-thumbs.controller';
 import { CreatorVideoThumbnailsController } from './videos/video-thumbnails.controller';
 import { CreatorVideoThumbnailsService } from './videos/video-thumbnails.service';
@@ -79,10 +79,10 @@ import { rateLimitConfig } from './common/rate-limit.config';
     UploadLimitsController,
     UploadStatusController,
     UploadProgressController,
-    UploadCompleteController,
     UploadFailController,
     CreatorUploadsController,
     UploadCompleteV2Controller,
+    VideoReprocessController,
     VideoThumbsController,
     CreatorVideoThumbnailsController,
     CreatorVideoVisibilityController,

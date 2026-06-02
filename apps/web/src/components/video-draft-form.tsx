@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth/tokens";
 
 type Channel = { id: string; slug: string; name: string };
 type Tag = { id: string; slug: string; name: string };
@@ -30,26 +32,19 @@ export default function VideoDraftForm({ locale }: { locale: string }) {
       .catch(() => {});
   }, [api, locale]);
 
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-
   const toggle = (arr: string[], value: string, setter: (v: string[]) => void) => {
     if (arr.includes(value)) setter(arr.filter((x) => x !== value));
     else setter([...arr, value]);
   };
 
   const submit = async () => {
-    if (!token) {
+    if (!getAccessToken()) {
       setMessage("Not logged in");
       return;
     }
 
-    const res = await fetch(`${api}/creator/videos/draft`, {
+    const res = await apiFetch(`/creator/videos/draft`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
       body: JSON.stringify({
         locale,
         title,

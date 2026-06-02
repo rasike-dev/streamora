@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import {
+  PageFrame,
+  PageHeading,
+  UserBanner,
+} from "@/components/layout";
+import { apiFetch } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth/tokens";
+import { takedownVideo, archiveVideo, restoreVideo } from "@/lib/api/admin-governance";
 
 type Row = {
   id: string;
@@ -20,9 +29,14 @@ type Row = {
 };
 
 export default function ModerationPage() {
-  const api = process.env.NEXT_PUBLIC_API_URL!;
   const params = useParams();
   const locale = (params.locale as string) || "en";
+  const tMod = useTranslations("moderationPage");
+  const tAdmin = useTranslations("adminHub");
+  const tErrors = useTranslations("errors");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
+
   const [rows, setRows] = useState<Row[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -30,30 +44,44 @@ export default function ModerationPage() {
   const [rejectNote, setRejectNote] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("PENDING_APPROVAL");
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const load = useCallback(async () => {
+    if (!getAccessToken()) {
+      setErr("UNAUTHORIZED");
+      setRows([]);
+      return;
+    }
 
-  const load = async () => {
-    if (!token) return setErr("Not logged in");
-    const res = await fetch(`${api}/admin/moderation/queue?status=${statusFilter}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) return setErr(await res.text());
+    const res = await apiFetch(`/admin/moderation/queue?status=${statusFilter}`);
+    if (!res.ok) {
+      if (res.status === 401) {
+        setErr("UNAUTHORIZED");
+      } else if (res.status === 403) {
+        setErr("FORBIDDEN");
+      } else {
+        setErr(await res.text());
+      }
+      setRows([]);
+      return;
+    }
+
+    setErr(null);
     setRows(await res.json());
-  };
+  }, [statusFilter]);
 
-  useEffect(() => { load(); }, [statusFilter]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const act = async (id: string, action: "approve" | "reject" | "publish") => {
-    if (!token) return;
-    
+    if (!getAccessToken()) return;
+
     if (action === "reject") {
       setRejectingId(id);
       return;
     }
-    
-    const res = await fetch(`${api}/admin/videos/${id}/${action}`, {
+
+    const res = await apiFetch(`/admin/videos/${id}/${action}`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
       alert(await res.text());
@@ -63,17 +91,13 @@ export default function ModerationPage() {
   };
 
   const confirmReject = async (id: string) => {
-    if (!token || !rejectReason.trim()) {
+    if (!getAccessToken() || !rejectReason.trim()) {
       alert("Please provide a rejection reason");
       return;
     }
-    
-    const res = await fetch(`${api}/admin/videos/${id}/reject`, {
+
+    const res = await apiFetch(`/admin/videos/${id}/reject`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify({
         reason: rejectReason,
         note: rejectNote || undefined,
@@ -92,11 +116,55 @@ export default function ModerationPage() {
   };
 
   return (
-    <main className="min-h-dvh p-4 space-y-4">
-      <h1 className="text-xl font-semibold">Moderation Queue</h1>
-      {err && <div className="text-sm text-red-600">{err}</div>}
+    <PageFrame>
+      <PageHeading
+        title={tMod("title")}
+        backHref={`/${locale}/admin`}
+        backLabel={tMod("backAdmin")}
+      />
 
-      <div className="flex gap-2">
+      {err === "UNAUTHORIZED" ? (
+        <UserBanner
+          variant="warning"
+          title={tErrors("unauthorized")}
+          body={tAdmin("needSignIn")}
+          primaryAction={{
+            href: `/${locale}/login`,
+            label: tNav("login"),
+          }}
+          secondaryAction={{
+            href: `/${locale}`,
+            label: tCommon("home"),
+          }}
+        />
+      ) : err === "FORBIDDEN" ? (
+        <UserBanner
+          variant="error"
+          title={tAdmin("forbidden")}
+          primaryAction={{
+            href: `/${locale}/dashboard`,
+            label: tCommon("dashboard"),
+          }}
+          secondaryAction={{
+            href: `/${locale}`,
+            label: tCommon("home"),
+          }}
+        />
+      ) : err ? (
+        <UserBanner
+          variant="error"
+          title={tErrors("generic")}
+          body={err}
+          secondaryAction={{
+            href: `/${locale}/admin`,
+            label: tMod("backAdmin"),
+          }}
+        />
+      ) : null}
+
+      {err !== "UNAUTHORIZED" && err !== "FORBIDDEN" ? (
+        <>
+          <div className="flex flex-wrap gap-2">
         {["PENDING_APPROVAL", "APPROVED", "REJECTED", "PUBLISHED", "TAKEDOWN", "ARCHIVED"].map((s) => (
           <button
             key={s}
@@ -114,7 +182,7 @@ export default function ModerationPage() {
 
       <div className="space-y-3">
         {rows.length === 0 && !err && (
-          <div className="text-sm text-muted-foreground">No pending videos</div>
+          <div className="text-sm text-muted-foreground">{tMod("emptyQueue")}</div>
         )}
         {rows.map((r) => (
           <div key={r.id} className="rounded-xl border p-4 space-y-2">
@@ -225,18 +293,8 @@ export default function ModerationPage() {
                         }
                         const note = prompt("Admin notes (optional):");
                         try {
-                          const res = await fetch(`${api}/admin/videos/${r.id}/takedown`, {
-                            method: "POST",
-                            headers: {
-                              Authorization: `Bearer ${token}`,
-                              "Content-Type": "application/json",
-                            },
-                            body: JSON.stringify({ reason: reason.trim(), note: note?.trim() || undefined }),
-                          });
-                          if (!res.ok) {
-                            alert(await res.text());
-                            return;
-                          }
+                          if (!getAccessToken()) return;
+                          await takedownVideo(r.id, reason.trim(), note?.trim() || undefined);
                           await load();
                         } catch (e: any) {
                           alert(`Failed: ${e.message}`);
@@ -251,18 +309,8 @@ export default function ModerationPage() {
                         const reason = prompt("Archive reason (optional):");
                         const note = prompt("Admin notes (optional):");
                         try {
-                          const res = await fetch(`${api}/admin/videos/${r.id}/archive`, {
-                            method: "POST",
-                            headers: {
-                              Authorization: `Bearer ${token}`,
-                              "Content-Type": "application/json",
-                            },
-                            body: JSON.stringify({ reason: reason?.trim() || undefined, note: note?.trim() || undefined }),
-                          });
-                          if (!res.ok) {
-                            alert(await res.text());
-                            return;
-                          }
+                          if (!getAccessToken()) return;
+                          await archiveVideo(r.id, reason?.trim() || undefined, note?.trim() || undefined);
                           await load();
                         } catch (e: any) {
                           alert(`Failed: ${e.message}`);
@@ -275,22 +323,12 @@ export default function ModerationPage() {
                 )}
                 {(r.status === "TAKEDOWN" || r.status === "ARCHIVED") && (
                   <button
-                    className="rounded-xl border px-3 py-1 text-sm bg-green-50 hover:bg-green-100"
+                    className="rounded-xl border px-3 py-1 text-sm bg-green-50 hover:bg-green-100 dark:bg-green-950 dark:hover:bg-green-900"
                     onClick={async () => {
                       const note = prompt("Restore note (optional):");
                       try {
-                        const res = await fetch(`${api}/admin/videos/${r.id}/restore`, {
-                          method: "POST",
-                          headers: {
-                            Authorization: `Bearer ${token}`,
-                            "Content-Type": "application/json",
-                          },
-                          body: JSON.stringify({ note: note?.trim() || undefined }),
-                        });
-                        if (!res.ok) {
-                          alert(await res.text());
-                          return;
-                        }
+                        if (!getAccessToken()) return;
+                        await restoreVideo(r.id, note?.trim() || undefined);
                         await load();
                       } catch (e: any) {
                         alert(`Failed: ${e.message}`);
@@ -317,6 +355,8 @@ export default function ModerationPage() {
           </div>
         ))}
       </div>
-    </main>
+        </>
+      ) : null}
+    </PageFrame>
   );
 }

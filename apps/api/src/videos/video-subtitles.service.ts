@@ -14,6 +14,22 @@ export class VideoSubtitlesService {
     private readonly gcsService: GcsService,
   ) {}
 
+  /**
+   * The controller passes the Keycloak subject (`sub`), but `video.uploaderId`
+   * references the internal `User.id`. Resolve the internal id before any
+   * ownership comparison.
+   */
+  private async resolveInternalUserId(keycloakSub: string): Promise<string> {
+    const user = await this.prisma.user.findUnique({
+      where: { keycloakSub },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new ForbiddenException('You cannot access this video');
+    }
+    return user.id;
+  }
+
   async listSubtitles(videoId: string, userId: string) {
     const video = await this.prisma.video.findUnique({
       where: { id: videoId },
@@ -27,7 +43,8 @@ export class VideoSubtitlesService {
       throw new NotFoundException('Video not found');
     }
 
-    if (video.uploaderId !== userId) {
+    const internalUserId = await this.resolveInternalUserId(userId);
+    if (video.uploaderId !== internalUserId) {
       throw new ForbiddenException('You cannot access this video');
     }
 
@@ -71,7 +88,8 @@ export class VideoSubtitlesService {
       throw new NotFoundException('Video not found');
     }
 
-    if (video.uploaderId !== userId) {
+    const internalUserId = await this.resolveInternalUserId(userId);
+    if (video.uploaderId !== internalUserId) {
       throw new ForbiddenException(
         'You cannot upload subtitles for this video',
       );
@@ -163,7 +181,8 @@ export class VideoSubtitlesService {
       throw new NotFoundException('Video not found');
     }
 
-    if (video.uploaderId !== userId) {
+    const internalUserId = await this.resolveInternalUserId(userId);
+    if (video.uploaderId !== internalUserId) {
       throw new ForbiddenException(
         'You cannot delete subtitles for this video',
       );

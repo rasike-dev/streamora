@@ -1,10 +1,27 @@
 "use client";
 
+import Link from "next/link";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import {
+  PageFrame,
+  PageHeading,
+  UserBanner,
+} from "@/components/layout";
 import { getCreatorAnalyticsOverview } from "@/lib/api/creator-analytics";
+
+const card =
+  "rounded-2xl border border-black/10 bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.04]";
+const panel =
+  "rounded-2xl border border-black/10 bg-black/[0.02] p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04]";
+const btnGhost =
+  "rounded-xl border border-black/15 px-4 py-2 text-sm hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]";
+const toggleInactive =
+  "px-4 py-2 text-sm transition hover:bg-black/[0.04] dark:hover:bg-white/[0.06]";
+const toggleActive =
+  "bg-black/[0.06] px-4 py-2 text-sm font-semibold dark:bg-white/[0.08]";
 
 function StatCard({
   label,
@@ -14,32 +31,43 @@ function StatCard({
   value: string | number;
 }) {
   return (
-    <div className="rounded-2xl border p-4 bg-white">
-      <div className="text-sm text-gray-500">{label}</div>
+    <div className={card}>
+      <div className="text-sm text-muted-foreground">{label}</div>
       <div className="mt-2 text-2xl font-semibold">{value}</div>
     </div>
   );
 }
 
 export default function DashboardPage() {
-  const t = useTranslations();
+  const t = useTranslations("dashboard");
+  const tShell = useTranslations("dashboardShell");
+  const tErrors = useTranslations("errors");
+  const tCommon = useTranslations("common");
+  const tNav = useTranslations("nav");
   const params = useParams();
   const locale = (params.locale as string) || "en";
 
   const [days, setDays] = useState<7 | 30>(30);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [failKind, setFailKind] = useState<"unauthorized" | "network" | null>(
+    null,
+  );
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      setError(null);
+      setFailKind(null);
       try {
         const result = await getCreatorAnalyticsOverview(days, locale);
         setData(result);
       } catch (e: any) {
-        setError(e.message || "Failed to load analytics");
+        if (e?.message === "UNAUTHORIZED") {
+          setFailKind("unauthorized");
+        } else {
+          setFailKind("network");
+        }
+        setData(null);
       } finally {
         setLoading(false);
       }
@@ -50,94 +78,124 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <main className="min-h-dvh p-4">
-        <div className="text-sm text-gray-600">Loading dashboard analytics...</div>
-      </main>
+      <PageFrame>
+        <PageHeading title={t("title")} />
+        <p className="text-sm text-muted-foreground">{tShell("loadingDashboard")}</p>
+      </PageFrame>
     );
   }
 
-  if (error || !data) {
+  if (failKind || !data) {
     return (
-      <main className="min-h-dvh p-4">
-        <div className="text-sm text-red-600">
-          {error || "Failed to load analytics overview."}
-        </div>
-      </main>
+      <PageFrame>
+        <PageHeading
+          title={t("title")}
+          backHref={`/${locale}`}
+          backLabel={tCommon("backToHome")}
+        />
+        <UserBanner
+          variant="error"
+          title={
+            failKind === "unauthorized"
+              ? tErrors("unauthorized")
+              : tShell("analyticsLoadError")
+          }
+          body={tShell("retryHint")}
+          primaryAction={
+            failKind === "unauthorized"
+              ? { href: `/${locale}/login`, label: tNav("login") }
+              : { href: `/${locale}/dashboard`, label: tCommon("retry") }
+          }
+          secondaryAction={{
+            href: `/${locale}`,
+            label: tCommon("home"),
+          }}
+        />
+      </PageFrame>
     );
   }
 
   return (
-    <main className="min-h-dvh p-4 space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{t("dashboard.title")}</h1>
-          <p className="text-sm text-gray-500">
-            Overview for the last {data.rangeDays} days
-          </p>
-        </div>
-
-        <div className="flex rounded-xl border overflow-hidden">
-          <button
-            className={`px-4 py-2 text-sm ${
-              days === 7 ? "font-semibold bg-gray-100" : ""
-            }`}
-            onClick={() => setDays(7)}
-          >
-            7 days
-          </button>
-          <button
-            className={`px-4 py-2 text-sm ${
-              days === 30 ? "font-semibold bg-gray-100" : ""
-            }`}
-            onClick={() => setDays(30)}
-          >
-            30 days
-          </button>
-        </div>
-      </div>
+    <PageFrame>
+      <PageHeading
+        title={t("title")}
+        description={tShell("overviewSubtitle", { days: data.rangeDays })}
+        actions={
+          <div className="flex overflow-hidden rounded-xl border border-black/15 dark:border-white/15">
+            <button
+              type="button"
+              className={days === 7 ? toggleActive : toggleInactive}
+              onClick={() => setDays(7)}
+            >
+              {tShell("last7")}
+            </button>
+            <button
+              type="button"
+              className={days === 30 ? toggleActive : toggleInactive}
+              onClick={() => setDays(30)}
+            >
+              {tShell("last30")}
+            </button>
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <StatCard label="Views" value={data.totals.views} />
+        <StatCard label={tShell("views")} value={data.totals.views} />
         <StatCard
-          label="Unique Viewers"
+          label={tShell("uniqueViewers")}
           value={data.totals.uniqueViewers}
         />
-        <StatCard label="Play Starts" value={data.totals.playStarts} />
-        <StatCard label="Completions" value={data.totals.completions} />
+        <StatCard label={tShell("playStarts")} value={data.totals.playStarts} />
+        <StatCard label={tShell("completions")} value={data.totals.completions} />
         <StatCard
-          label="Completion Rate"
+          label={tShell("completionRate")}
           value={`${data.totals.completionRate}%`}
         />
       </div>
 
-      <section className="rounded-2xl border p-4 bg-white">
-        <h2 className="text-lg font-semibold mb-3">Traffic Sources</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-          <div>Direct: {data.trafficSources.directViews}</div>
-          <div>Share: {data.trafficSources.shareViews}</div>
-          <div>Channel: {data.trafficSources.channelViews}</div>
-          <div>Tag: {data.trafficSources.tagViews}</div>
-          <div>Search: {data.trafficSources.searchViews}</div>
-          <div>External: {data.trafficSources.externalViews}</div>
-          <div>Unknown: {data.trafficSources.unknownViews}</div>
+      <section className={`mt-6 ${panel}`}>
+        <h2 className="mb-3 text-lg font-semibold">{tShell("trafficSources")}</h2>
+        <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+          <div>
+            {tShell("trafficDirect")}: {data.trafficSources.directViews}
+          </div>
+          <div>
+            {tShell("trafficShare")}: {data.trafficSources.shareViews}
+          </div>
+          <div>
+            {tShell("trafficChannel")}: {data.trafficSources.channelViews}
+          </div>
+          <div>
+            {tShell("trafficTag")}: {data.trafficSources.tagViews}
+          </div>
+          <div>
+            {tShell("trafficSearch")}: {data.trafficSources.searchViews}
+          </div>
+          <div>
+            {tShell("trafficExternal")}: {data.trafficSources.externalViews}
+          </div>
+          <div>
+            {tShell("trafficUnknown")}: {data.trafficSources.unknownViews}
+          </div>
         </div>
       </section>
 
-      <section className="rounded-2xl border p-4 bg-white">
-        <h2 className="text-lg font-semibold mb-3">Daily Trend</h2>
+      <section className={`mt-6 ${panel}`}>
+        <h2 className="mb-3 text-lg font-semibold">{tShell("dailyTrend")}</h2>
         {data.dailyTrend.length === 0 ? (
-          <div className="text-sm text-gray-500">No data available</div>
+          <p className="text-sm text-muted-foreground">{tShell("noDailyData")}</p>
         ) : (
           <div className="space-y-2 text-sm">
             {data.dailyTrend.map((row: any) => (
               <div
                 key={row.date}
-                className="flex items-center justify-between border-b pb-2"
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 pb-2 dark:border-white/10"
               >
                 <span>{row.date}</span>
-                <span>
-                  Views {row.views} · Starts {row.playStarts} · Completions{" "}
-                  {row.completions}
+                <span className="text-muted-foreground">
+                  {tShell("views")} {row.views} · {tShell("playStarts")}{" "}
+                  {row.playStarts} · {tShell("completions")} {row.completions}
                 </span>
               </div>
             ))}
@@ -145,39 +203,41 @@ export default function DashboardPage() {
         )}
       </section>
 
-      <section className="rounded-2xl border p-4 bg-white">
-        <h2 className="text-lg font-semibold mb-3">Top Videos</h2>
+      <section className={`mt-6 ${panel}`}>
+        <h2 className="mb-3 text-lg font-semibold">{tShell("topVideos")}</h2>
         {data.topVideos.length === 0 ? (
-          <div className="text-sm text-gray-500">No videos with analytics yet</div>
+          <p className="text-sm text-muted-foreground">{tShell("noTopVideos")}</p>
         ) : (
           <div className="space-y-3">
             {data.topVideos.map((video: any) => (
               <div
                 key={video.videoId}
-                className="flex items-center gap-3 border rounded-xl p-3"
+                className="flex items-center gap-3 rounded-xl border border-black/10 p-3 dark:border-white/10"
               >
                 {video.thumbnailUrl ? (
-                  <img
+                  <Image
                     src={video.thumbnailUrl}
                     alt={video.title}
-                    className="w-24 h-14 object-cover rounded-lg"
+                    width={96}
+                    height={56}
+                    unoptimized
+                    className="h-14 w-24 shrink-0 rounded-lg object-cover"
                   />
                 ) : (
-                  <div className="w-24 h-14 rounded-lg bg-gray-100" />
+                  <div className="h-14 w-24 shrink-0 rounded-lg bg-black/5 dark:bg-white/10" />
                 )}
 
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium truncate">{video.title}</div>
-                  <div className="text-sm text-gray-500">
-                    {video.views} views · {video.playStarts} starts ·{" "}
-                    {video.completionRate}% completion
+                  <div className="truncate font-medium">{video.title}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {video.views} · {video.playStarts} · {video.completionRate}%
                   </div>
                 </div>
                 <Link
                   href={`/${locale}/dashboard/videos/${video.videoId}/analytics`}
-                  className="text-sm text-blue-600 underline"
+                  className="shrink-0 text-sm font-medium text-foreground underline underline-offset-2"
                 >
-                  View Analytics
+                  {tShell("viewAnalytics")}
                 </Link>
               </div>
             ))}
@@ -185,20 +245,17 @@ export default function DashboardPage() {
         )}
       </section>
 
-      <div className="flex gap-3">
-        <Link
-          href={`/${locale}/dashboard/uploads`}
-          className="rounded-xl border px-4 py-2 text-sm"
-        >
-          Bulk Upload
+      <div className="mt-8 flex flex-wrap gap-3">
+        <Link href={`/${locale}/dashboard/uploads`} className={btnGhost}>
+          {tShell("bulkUploads")}
         </Link>
-        <Link
-          href={`/${locale}/dashboard/videos`}
-          className="rounded-xl border px-4 py-2 text-sm"
-        >
-          My Videos
+        <Link href={`/${locale}/dashboard/videos`} className={btnGhost}>
+          {t("myVideos")}
+        </Link>
+        <Link href={`/${locale}/upload`} className={btnGhost}>
+          {tShell("newUpload")}
         </Link>
       </div>
-    </main>
+    </PageFrame>
   );
 }

@@ -1,18 +1,72 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getCreatorVideos } from "@/lib/api/creator-videos";
+import {
+  PageFrame,
+  PageHeading,
+  UserBanner,
+} from "@/components/layout";
+import { getCreatorVideos, reprocessCreatorVideo } from "@/lib/api/creator-videos";
+
+const REPROCESSABLE = ["DRAFT", "UPLOADED", "PROCESSING_FAILED"];
+
+const surface =
+  "rounded-2xl border border-black/10 bg-black/[0.02] p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04]";
+const rowCard =
+  "flex gap-4 rounded-2xl border border-black/10 bg-black/[0.02] p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04]";
+const thumbBg = "h-24 w-40 shrink-0 overflow-hidden rounded-xl bg-black/5 dark:bg-white/10";
+const btnPrimary =
+  "rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90";
+const btnGhost =
+  "rounded-xl border border-black/15 px-4 py-2 text-sm hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]";
+const btnMuted =
+  "rounded-xl border border-black/15 px-4 py-2 text-sm text-muted-foreground dark:border-white/15";
 
 export default function CreatorVideosPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const locale = (params.locale as string) || "en";
 
+  const t = useTranslations("dashboardVideos");
+  const tVideos = useTranslations("videosPage");
+  const tCommon = useTranslations("common");
+  const tErrors = useTranslations("errors");
+  const tNav = useTranslations("nav");
+
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [failKind, setFailKind] = useState<"unauthorized" | "network" | null>(
+    null,
+  );
+  const [reprocessingId, setReprocessingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const startProcessing = async (videoId: string) => {
+    setReprocessingId(videoId);
+    setNotice(null);
+    try {
+      await reprocessCreatorVideo(videoId);
+      setNotice("Processing started ✅ This video will become READY shortly.");
+      setData((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.map((v: any) =>
+                v.id === videoId ? { ...v, status: "PROCESSING" } : v,
+              ),
+            }
+          : prev,
+      );
+    } catch (e: any) {
+      setNotice(`Could not start processing: ${e.message}`);
+    } finally {
+      setReprocessingId(null);
+    }
+  };
 
   const q = searchParams.get("q") ?? "";
   const status = searchParams.get("status") ?? "";
@@ -22,7 +76,7 @@ export default function CreatorVideosPage() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      setError(null);
+      setFailKind(null);
       try {
         const result = await getCreatorVideos({
           locale,
@@ -34,7 +88,12 @@ export default function CreatorVideosPage() {
         });
         setData(result);
       } catch (e: any) {
-        setError(e.message || "Failed to load videos");
+        if (e?.message === "UNAUTHORIZED") {
+          setFailKind("unauthorized");
+        } else {
+          setFailKind("network");
+        }
+        setData(null);
       } finally {
         setLoading(false);
       }
@@ -45,47 +104,73 @@ export default function CreatorVideosPage() {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-6xl p-4">
-        <div className="text-sm text-gray-600">Loading...</div>
-      </main>
+      <PageFrame>
+        <PageHeading title={t("title")} />
+        <p className="text-sm text-muted-foreground">{tCommon("loading")}</p>
+      </PageFrame>
     );
   }
 
-  if (error) {
+  if (failKind || !data) {
     return (
-      <main className="mx-auto max-w-6xl p-4">
-        <div className="text-sm text-red-600">{error}</div>
-      </main>
+      <PageFrame>
+        <PageHeading
+          title={t("title")}
+          backHref={`/${locale}/dashboard`}
+          backLabel={tCommon("backToDashboard")}
+        />
+        <UserBanner
+          variant="error"
+          title={
+            failKind === "unauthorized"
+              ? tErrors("unauthorized")
+              : t("loadError")
+          }
+          body={tErrors("network")}
+          primaryAction={
+            failKind === "unauthorized"
+              ? { href: `/${locale}/login`, label: tNav("login") }
+              : { href: `/${locale}/dashboard/videos`, label: tCommon("retry") }
+          }
+          secondaryAction={{
+            href: `/${locale}/dashboard`,
+            label: tCommon("backToDashboard"),
+          }}
+        />
+      </PageFrame>
     );
   }
 
-  if (!data) {
-    return null;
-  }
+  const filtered = Boolean(q || status || visibility);
 
   return (
-    <main className="mx-auto max-w-6xl p-4 space-y-6">
+    <PageFrame>
+      <PageHeading
+        title={t("title")}
+        description={t("description")}
+        backHref={`/${locale}/dashboard`}
+        backLabel={tCommon("backToDashboard")}
+      />
+
       <form
         method="get"
         action={`/${locale}/dashboard/videos`}
-        className="rounded-2xl border bg-white p-4 shadow-sm"
+        className={`${surface} mt-2 space-y-4`}
       >
-        <h1 className="text-xl font-semibold">My Videos</h1>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-4">
           <input
             name="q"
             defaultValue={q}
-            placeholder="Search your videos..."
-            className="rounded-xl border px-3 py-2 text-sm md:col-span-2"
+            placeholder={t("searchPlaceholder")}
+            className="rounded-xl border border-black/15 bg-background px-3 py-2 text-sm md:col-span-2 dark:border-white/15"
           />
 
           <select
             name="status"
             defaultValue={status}
-            className="rounded-xl border px-3 py-2 text-sm"
+            className="rounded-xl border border-black/15 bg-background px-3 py-2 text-sm dark:border-white/15"
           >
-            <option value="">All statuses</option>
+            <option value="">{t("allStatuses")}</option>
             <option value="DRAFT">DRAFT</option>
             <option value="READY">READY</option>
             <option value="PENDING_APPROVAL">PENDING_APPROVAL</option>
@@ -97,47 +182,47 @@ export default function CreatorVideosPage() {
           <select
             name="visibility"
             defaultValue={visibility}
-            className="rounded-xl border px-3 py-2 text-sm"
+            className="rounded-xl border border-black/15 bg-background px-3 py-2 text-sm dark:border-white/15"
           >
-            <option value="">All visibility</option>
+            <option value="">{t("allVisibility")}</option>
             <option value="PUBLIC">PUBLIC</option>
             <option value="UNLISTED">UNLISTED</option>
             <option value="PRIVATE">PRIVATE</option>
           </select>
         </div>
 
-        <div className="mt-3 flex gap-2">
-          <button
-            type="submit"
-            className="rounded-xl bg-black px-4 py-2 text-sm text-white"
-          >
-            Search
+        <div className="flex flex-wrap gap-2">
+          <button type="submit" className={btnPrimary}>
+            {tVideos("search")}
           </button>
-          <Link
-            href={`/${locale}/dashboard/videos`}
-            className="rounded-xl border px-4 py-2 text-sm"
-          >
-            Clear
+          <Link href={`/${locale}/dashboard/videos`} className={btnGhost}>
+            {tVideos("clear")}
           </Link>
         </div>
       </form>
 
-      <section className="space-y-3">
+      {notice ? (
+        <div className="sticky top-2 z-10 mt-4 rounded-xl border border-black/10 bg-background/95 px-4 py-3 text-sm shadow-sm backdrop-blur dark:border-white/15">
+          {notice}
+        </div>
+      ) : null}
+
+      <section className="mt-8 space-y-3">
         {data.items.length === 0 ? (
-          <div className="rounded-2xl border bg-white p-6 text-sm text-gray-600 shadow-sm">
-            No videos matched your filters.
+          <div className={`${surface} text-sm text-muted-foreground`}>
+            {filtered ? t("emptyFiltered") : t("empty")}
           </div>
         ) : (
           data.items.map((video: any) => (
-            <div
-              key={video.id}
-              className="flex gap-4 rounded-2xl border bg-white p-4 shadow-sm"
-            >
-              <div className="h-24 w-40 shrink-0 overflow-hidden rounded-xl bg-gray-100">
+            <div key={video.id} className={rowCard}>
+              <div className={thumbBg}>
                 {video.thumbnailUrl ? (
-                  <img
+                  <Image
                     src={video.thumbnailUrl}
                     alt={video.title}
+                    width={160}
+                    height={96}
+                    unoptimized
                     className="h-full w-full object-cover"
                   />
                 ) : null}
@@ -146,45 +231,58 @@ export default function CreatorVideosPage() {
               <div className="min-w-0 flex-1">
                 <h2 className="truncate text-sm font-semibold">{video.title}</h2>
                 {video.tagline ? (
-                  <p className="mt-1 line-clamp-2 text-xs text-gray-600">
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                     {video.tagline}
                   </p>
                 ) : null}
 
                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                  <span className="rounded-full border px-2 py-0.5">
+                  <span className="rounded-full border border-black/10 px-2 py-0.5 dark:border-white/15">
                     {video.status}
                   </span>
-                  <span className="rounded-full border px-2 py-0.5">
+                  <span className="rounded-full border border-black/10 px-2 py-0.5 dark:border-white/15">
                     {video.visibility}
                   </span>
                   {video.scheduledAt ? (
-                    <span className="rounded-full border px-2 py-0.5">
-                      Scheduled
+                    <span className="rounded-full border border-black/10 px-2 py-0.5 dark:border-white/15">
+                      {t("scheduledBadge")}
                     </span>
                   ) : null}
                 </div>
 
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <Link
                     href={`/${locale}/dashboard/videos/${video.id}/edit`}
-                    className="rounded-xl border px-3 py-1 text-sm"
+                    className={btnGhost}
                   >
-                    Edit
+                    {tCommon("editVideo")}
                   </Link>
 
                   <Link
                     href={`/${locale}/dashboard/videos/${video.id}/thumbnails`}
-                    className="rounded-xl border px-3 py-1 text-sm"
+                    className={btnGhost}
                   >
-                    Thumbnails
+                    {tCommon("thumbnails")}
                   </Link>
                   <Link
                     href={`/${locale}/dashboard/videos/${video.id}/analytics`}
-                    className="rounded-xl border px-3 py-1 text-sm"
+                    className={btnGhost}
                   >
-                    Analytics
+                    {tCommon("analytics")}
                   </Link>
+
+                  {REPROCESSABLE.includes(video.status) ? (
+                    <button
+                      type="button"
+                      onClick={() => startProcessing(video.id)}
+                      disabled={reprocessingId === video.id}
+                      className={btnPrimary}
+                    >
+                      {reprocessingId === video.id
+                        ? "Starting…"
+                        : "Start processing"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -193,9 +291,12 @@ export default function CreatorVideosPage() {
       </section>
 
       {data.pagination.totalPages > 1 && (
-        <section className="flex items-center justify-between">
-          <div className="text-sm text-gray-600">
-            Page {data.pagination.page} of {data.pagination.totalPages}
+        <section className="mt-8 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm text-muted-foreground">
+            {tVideos("pageOf", {
+              page: data.pagination.page,
+              total: data.pagination.totalPages,
+            })}
           </div>
 
           <div className="flex gap-2">
@@ -207,14 +308,12 @@ export default function CreatorVideosPage() {
                   ...(visibility ? { visibility } : {}),
                   page: String(data.pagination.page - 1),
                 }).toString()}`}
-                className="rounded-xl border px-4 py-2 text-sm"
+                className={btnGhost}
               >
-                Previous
+                {tVideos("previous")}
               </Link>
             ) : (
-              <span className="rounded-xl border px-4 py-2 text-sm text-gray-400">
-                Previous
-              </span>
+              <span className={btnMuted}>{tVideos("previous")}</span>
             )}
 
             {data.pagination.page < data.pagination.totalPages ? (
@@ -225,18 +324,16 @@ export default function CreatorVideosPage() {
                   ...(visibility ? { visibility } : {}),
                   page: String(data.pagination.page + 1),
                 }).toString()}`}
-                className="rounded-xl border px-4 py-2 text-sm"
+                className={btnGhost}
               >
-                Next
+                {tVideos("next")}
               </Link>
             ) : (
-              <span className="rounded-xl border px-4 py-2 text-sm text-gray-400">
-                Next
-              </span>
+              <span className={btnMuted}>{tVideos("next")}</span>
             )}
           </div>
         </section>
       )}
-    </main>
+    </PageFrame>
   );
 }

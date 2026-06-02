@@ -166,8 +166,15 @@ export class UploadsController {
     const bucket = this.gcs.bucket(bucketName);
     const file = bucket.file(objectKey);
 
+    const resumableOrigin =
+      process.env.UPLOAD_RESUMABLE_ORIGIN?.trim() ||
+      process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+      process.env.ALLOWED_ORIGINS?.split(',')
+        .map((origin) => origin.trim())
+        .find(Boolean);
+
     const [sessionUrl] = await file.createResumableUpload({
-      origin: 'http://localhost:3000', // ok for dev; in prod use your domain
+      ...(resumableOrigin ? { origin: resumableOrigin } : {}),
       metadata: {
         contentType,
       },

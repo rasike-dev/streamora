@@ -335,21 +335,15 @@ async function processMessage(evt: VideoUploadedEvent) {
     create: { videoId: evt.videoId, quality: "720p", playlistKey: `${prefix}/1/playlist.m3u8`, bandwidth: 2800000, width: 1280, height: 720, codec: "h264+aac" },
   });
 
-  // Video status after thumbs + HLS
-  // Day 9: Set to PENDING_APPROVAL or APPROVED based on creator approval
+  // Video status after thumbs + HLS.
+  // Upload-first flow: processing lands on READY. The creator then reviews
+  // metadata and explicitly submits (READY -> PENDING_APPROVAL).
   const video = await prisma.video.findUnique({ where: { id: evt.videoId } });
   if (!video) throw new Error("Video not found");
 
-  let nextStatus: any = "PENDING_APPROVAL";
-
-  if (video.uploaderId) {
-    const profile = await prisma.creatorProfile.findUnique({ where: { userId: video.uploaderId } });
-    if (profile?.approval === "APPROVED") nextStatus = "APPROVED";
-  }
-
   await prisma.video.update({
     where: { id: evt.videoId },
-    data: { status: nextStatus },
+    data: { status: "READY" },
   });
 
   // Update job row on success

@@ -1,15 +1,7 @@
+import { apiFetch } from "../api";
+
 export async function listVideoSubtitles(videoId: string) {
-  const api = process.env.NEXT_PUBLIC_API_URL!;
-  const token = localStorage.getItem('access_token');
-
-  if (!token) {
-    throw new Error('Not authenticated');
-  }
-
-  const res = await fetch(`${api}/creator/videos/${videoId}/subtitles`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  const res = await apiFetch(`/creator/videos/${videoId}/subtitles`, {
     credentials: 'include',
   });
 
@@ -21,22 +13,12 @@ export async function listVideoSubtitles(videoId: string) {
 }
 
 export async function uploadSubtitle(videoId: string, locale: string, file: File) {
-  const api = process.env.NEXT_PUBLIC_API_URL!;
-  const token = localStorage.getItem('access_token');
-
-  if (!token) {
-    throw new Error('Not authenticated');
-  }
-
   const formData = new FormData();
   formData.append('locale', locale);
   formData.append('file', file);
 
-  const res = await fetch(`${api}/creator/videos/${videoId}/subtitles`, {
+  const res = await apiFetch(`/creator/videos/${videoId}/subtitles`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
     credentials: 'include',
     body: formData,
   });
@@ -50,18 +32,8 @@ export async function uploadSubtitle(videoId: string, locale: string, file: File
 }
 
 export async function deleteSubtitle(videoId: string, locale: string) {
-  const api = process.env.NEXT_PUBLIC_API_URL!;
-  const token = localStorage.getItem('access_token');
-
-  if (!token) {
-    throw new Error('Not authenticated');
-  }
-
-  const res = await fetch(`${api}/creator/videos/${videoId}/subtitles/${locale}`, {
+  const res = await apiFetch(`/creator/videos/${videoId}/subtitles/${locale}`, {
     method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
     credentials: 'include',
   });
 

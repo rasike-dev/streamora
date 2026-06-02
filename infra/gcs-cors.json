@@ -1,0 +1,18 @@
+[
+  {
+    "origin": [
+      "http://localhost:3000",
+      "https://streamora.app",
+      "https://admin.streamora.app"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": [
+      "Content-Type",
+      "Range",
+      "Accept-Ranges",
+      "Content-Range",
+      "Content-Length"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

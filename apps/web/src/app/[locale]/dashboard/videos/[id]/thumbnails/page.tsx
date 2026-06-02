@@ -1,5 +1,7 @@
-import Link from "next/link";
-import { ThumbnailPicker } from "@/components/videos/ThumbnailPicker";
+import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
+import { PageFrame, PageHeading } from '@/components/layout';
+import { ThumbnailPicker } from '@/components/videos/ThumbnailPicker';
 
 export default async function VideoThumbnailsPage({
   params,
@@ -7,22 +9,24 @@ export default async function VideoThumbnailsPage({
   params: Promise<{ locale: string; id: string }>;
 }) {
   const { locale, id } = await params;
+  const tCommon = await getTranslations({ locale, namespace: 'common' });
 
   return (
-    <main className="min-h-dvh p-4">
-      <div className="mx-auto max-w-5xl space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">Manage Thumbnails</h1>
+    <PageFrame>
+      <PageHeading
+        title={tCommon('thumbnails')}
+        backHref={`/${locale}/dashboard/videos`}
+        backLabel={tCommon('myVideos')}
+        actions={
           <Link
             href={`/${locale}/dashboard/videos/${id}/edit`}
-            className="text-sm text-blue-600 underline"
+            className="rounded-xl border border-black/15 px-3 py-2 text-sm hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
           >
-            Back to Edit
+            {tCommon('editVideo')}
           </Link>
-        </div>
-
-        <ThumbnailPicker locale={locale} videoId={id} />
-      </div>
-    </main>
+        }
+      />
+      <ThumbnailPicker locale={locale} videoId={id} />
+    </PageFrame>
   );
 }

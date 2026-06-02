@@ -1,3 +1,5 @@
+import { apiFetch } from "../api";
+
 export async function getCreatorVideos(params: {
   locale: string;
   q?: string;
@@ -6,9 +8,6 @@ export async function getCreatorVideos(params: {
   page?: number;
   pageSize?: number;
 }) {
-  const api = process.env.NEXT_PUBLIC_API_URL!;
-  const token = localStorage.getItem('access_token');
-
   const search = new URLSearchParams({
     locale: params.locale,
     page: String(params.page ?? 1),
@@ -19,40 +18,48 @@ export async function getCreatorVideos(params: {
   if (params.status) search.set('status', params.status);
   if (params.visibility) search.set('visibility', params.visibility);
 
-  const res = await fetch(`${api}/creator/videos?${search.toString()}`, {
+  const res = await apiFetch(`/creator/videos?${search.toString()}`, {
     cache: 'no-store',
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
   });
 
   if (!res.ok) {
-    throw new Error('Failed to load creator videos');
+    if (res.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error('FETCH_FAILED');
   }
 
   return res.json();
 }
 
 export async function resubmitCreatorVideo(videoId: string) {
-  const api = process.env.NEXT_PUBLIC_API_URL!;
-  const token = localStorage.getItem('access_token');
-
-  if (!token) {
-    throw new Error('Not authenticated');
-  }
-
-  const res = await fetch(`${api}/creator/videos/${videoId}/resubmit`, {
+  const res = await apiFetch(`/creator/videos/${videoId}/resubmit`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
     credentials: 'include',
   });
 
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.message || 'Failed to resubmit video');
+  }
+
+  return res.json();
+}
+
+export async function reprocessCreatorVideo(videoId: string) {
+  const res = await apiFetch(`/creator/videos/${videoId}/reprocess`, {
+    method: 'POST',
+  });
+
+  if (!res.ok) {
+    const raw = await res.text().catch(() => '');
+    let message = raw;
+    try {
+      message = JSON.parse(raw)?.message || raw;
+    } catch {
+      // raw is not JSON; use as-is
+    }
+    throw new Error(message || 'Failed to start processing');
   }
 
   return res.json();

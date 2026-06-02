@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { getPublicEmbedVideo } from '@/lib/api/public-embed';
 import { PublicVideoPlayer } from '@/components/videos/PublicVideoPlayer';
 
@@ -53,6 +54,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function EmbedVideoPage(props: PageProps) {
   const params = await props.params;
+  const tCommon = await getTranslations({
+    locale: params.locale,
+    namespace: 'common',
+  });
 
   let video;
   try {
@@ -103,7 +108,7 @@ export default async function EmbedVideoPage(props: PageProps) {
               rel="noopener noreferrer"
               className="underline underline-offset-2 hover:text-white"
             >
-              Watch on Streamora
+              {tCommon('openApp')}
             </Link>
           </div>
         </div>

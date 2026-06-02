@@ -12,12 +12,30 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   // CORS configuration - allow trusted origins
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',')
-    : ['http://localhost:3000'];
+  const configuredOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const defaultDevOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+  const allowedOrigins = Array.from(
+    new Set([...configuredOrigins, ...defaultDevOrigins]),
+  );
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Non-browser requests (no Origin header) are allowed.
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`CORS blocked for origin: ${origin}`), false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],

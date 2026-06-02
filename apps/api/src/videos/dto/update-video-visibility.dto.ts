@@ -1,3 +1,5 @@
+import { IsEnum } from 'class-validator';
+
 export enum VideoVisibilityDto {
   PUBLIC = 'PUBLIC',
   UNLISTED = 'UNLISTED',
@@ -5,5 +7,6 @@ export enum VideoVisibilityDto {
 }
 
 export class UpdateVideoVisibilityDto {
+  @IsEnum(VideoVisibilityDto)
   visibility!: VideoVisibilityDto;
 }

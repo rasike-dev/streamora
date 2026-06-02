@@ -24,6 +24,8 @@ cp apps/worker/.env.example apps/worker/.env
 ```
 Edit `.env` and `apps/web/.env.local` if your ports or Keycloak realm/client names differ. The API resolves `DATABASE_URL` and related vars from the **repository root** `.env` (see `apps/api` `ConfigModule` `envFilePath`). The web app uses **`apps/web/.env.local`** for `NEXT_PUBLIC_*` variables.
 
+Set `UPLOAD_RESUMABLE_ORIGIN` in `.env` to your web origin (local default: `http://localhost:3000`). The API uses this value when creating Google Cloud Storage resumable upload sessions.
+
 3. Start local infrastructure (Postgres, Redis, Keycloak):
 ```bash
 docker compose up -d

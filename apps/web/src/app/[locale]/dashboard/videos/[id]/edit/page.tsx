@@ -1,24 +1,23 @@
-import VideoDraftEditor from "@/components/video-draft-editor";
-import Link from "next/link";
+import { getTranslations } from 'next-intl/server';
+import { PageFrame, PageHeading } from '@/components/layout';
+import VideoDraftEditor from '@/components/video-draft-editor';
 
-export default function EditVideoPage({
+export default async function EditVideoPage({
   params,
 }: {
-  params: { locale: string; id: string };
+  params: Promise<{ locale: string; id: string }>;
 }) {
-  return (
-    <main className="min-h-dvh p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Edit Video</h1>
-        <Link
-          href={`/${params.locale}/dashboard`}
-          className="text-sm text-blue-600 underline"
-        >
-          Back to Dashboard
-        </Link>
-      </div>
+  const { locale, id } = await params;
+  const tCommon = await getTranslations({ locale, namespace: 'common' });
 
-      <VideoDraftEditor videoId={params.id} locale={params.locale} />
-    </main>
+  return (
+    <PageFrame>
+      <PageHeading
+        title={tCommon('editVideo')}
+        backHref={`/${locale}/dashboard/videos`}
+        backLabel={tCommon('myVideos')}
+      />
+      <VideoDraftEditor videoId={id} locale={locale} />
+    </PageFrame>
   );
 }

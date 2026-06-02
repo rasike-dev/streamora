@@ -1,19 +1,18 @@
-export async function getCreatorVideoAnalytics(videoId: string, days = 30) {
-  const api = process.env.NEXT_PUBLIC_API_URL!;
-  const token = localStorage.getItem("access_token");
+import { apiFetch } from "../api";
 
-  const res = await fetch(
-    `${api}/creator/videos/${videoId}/analytics?days=${days}`,
+export async function getCreatorVideoAnalytics(videoId: string, days = 30) {
+  const res = await apiFetch(
+    `/creator/videos/${videoId}/analytics?days=${days}`,
     {
       cache: "no-store",
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
     }
   );
 
   if (!res.ok) {
-    throw new Error("Failed to load analytics");
+    if (res.status === 401) {
+      throw new Error('UNAUTHORIZED');
+    }
+    throw new Error('FETCH_FAILED');
   }
 
   return res.json();

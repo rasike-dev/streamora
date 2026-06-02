@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { uploadToGcsResumableSession } from "@/lib/resumableUpload";
+import { apiFetch } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth/tokens";
 
 type UploadItem = {
   id: string;
@@ -15,25 +17,26 @@ type UploadItem = {
 };
 
 export function UploadManager({ locale }: { locale: string }) {
-  const api = process.env.NEXT_PUBLIC_API_URL!;
   const [limits, setLimits] = useState<{ maxBytes: number } | null>(null);
   const [videoId, setVideoId] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [tagline, setTagline] = useState("");
   const [items, setItems] = useState<UploadItem[]>([]);
   const cancels = useRef<Record<string, () => void>>({});
   const resumeInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    if (!token) return;
+    if (!getAccessToken()) return;
 
     // Load limits
-    fetch(`${api}/uploads/limits`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.ok ? r.json() : null)
+    apiFetch(`/uploads/limits`)
+      .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setLimits(d))
       .catch(() => {});
 
     // Load in-progress uploads from DB
-    fetch(`${api}/creator/uploads`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`/creator/uploads`)
       .then((r) => (r.ok ? r.json() : []))
       .then((list) => {
         setItems((prev) => {
@@ -56,7 +59,7 @@ export function UploadManager({ locale }: { locale: string }) {
         });
       })
       .catch(() => {});
-  }, [api]);
+  }, []);
 
   const maxBytesLabel = useMemo(() => {
     if (!limits?.maxBytes) return "";
@@ -76,6 +79,49 @@ export function UploadManager({ locale }: { locale: string }) {
         percent: 0,
       },
     ]);
+  };
+
+  const createDraftIfNeeded = async (item: UploadItem) => {
+    const existingVideoId = item.videoId?.trim();
+    if (existingVideoId) return existingVideoId;
+
+    if (!getAccessToken()) throw new Error("Session expired. Please sign in again.");
+
+    const fallbackTitle = item.file?.name
+      ? item.file.name.replace(/\.[^/.]+$/, "")
+      : "";
+
+    const res = await apiFetch(`/creator/videos/draft`, {
+      method: "POST",
+      body: JSON.stringify({
+        locale,
+        title: title.trim() || fallbackTitle || "Untitled upload",
+        description: description.trim() || undefined,
+        tagline: tagline.trim() || undefined,
+      }),
+    });
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error("Session expired. Please sign in again.");
+      }
+      throw new Error(`Failed to create draft: ${await res.text()}`);
+    }
+
+    const draft = await res.json();
+    const draftId = draft?.id;
+    if (!draftId) {
+      throw new Error("Draft creation failed: missing video id");
+    }
+
+    setVideoId(draftId);
+    setItems((prev) =>
+      prev.map((x) =>
+        x.id === item.id ? { ...x, videoId: draftId, message: "Draft created." } : x
+      )
+    );
+
+    return draftId;
   };
 
   const openResumePicker = (itemId: string) => {
@@ -99,24 +145,20 @@ export function UploadManager({ locale }: { locale: string }) {
   };
 
   const initUpload = async (item: UploadItem) => {
-    const token = localStorage.getItem("access_token");
-    if (!token) throw new Error("Not logged in");
+    if (!getAccessToken()) throw new Error("Session expired. Please sign in again.");
 
     if (!item.file) throw new Error("File required");
+    const resolvedVideoId = await createDraftIfNeeded(item);
 
     // Client-side size check (server still enforces)
     if (limits?.maxBytes && item.file.size > limits.maxBytes) {
       throw new Error(`File too large. Max: ${maxBytesLabel}`);
     }
 
-    const res = await fetch(`${api}/uploads/init`, {
+    const res = await apiFetch(`/uploads/init`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
       body: JSON.stringify({
-        videoId: item.videoId,
+        videoId: resolvedVideoId,
         filename: item.file.name,
         contentType: item.file.type || "application/octet-stream",
         sizeBytes: item.file.size,
@@ -124,12 +166,21 @@ export function UploadManager({ locale }: { locale: string }) {
       }),
     });
 
-    if (!res.ok) throw new Error(await res.text());
-    return res.json() as Promise<{
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error("Session expired. Please sign in again.");
+      }
+      throw new Error(await res.text());
+    }
+    const init = (await res.json()) as {
       uploadIntentId: string;
       objectKey: string;
       resumableSessionUrl: string;
-    }>;
+    };
+    return {
+      ...init,
+      videoId: resolvedVideoId,
+    };
   };
 
   const persistProgressThrottled = (() => {
@@ -139,12 +190,8 @@ export function UploadManager({ locale }: { locale: string }) {
       if (now - lastAt < 1200) return; // ~1.2s throttle
       lastAt = now;
 
-      await fetch(`${api}/uploads/${uploadIntentId}/progress`, {
+      await apiFetch(`/uploads/${uploadIntentId}/progress`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-        },
         body: JSON.stringify({ uploadedBytes, status: "UPLOADING" }),
       }).catch(() => {});
     };
@@ -202,31 +249,35 @@ export function UploadManager({ locale }: { locale: string }) {
       await promise;
 
       // Mark as complete in DB and verify
-      const completeRes = await fetch(`${api}/uploads/${init.uploadIntentId}/complete`, {
+      const completeRes = await apiFetch(`/uploads/${init.uploadIntentId}/complete`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` },
       });
 
       if (!completeRes.ok) {
+        if (completeRes.status === 401) {
+          throw new Error("Session expired. Please sign in again.");
+        }
         const errorText = await completeRes.text();
         throw new Error(`Verification failed: ${errorText}`);
       }
 
       setItems((prev) =>
-        prev.map((x) => (x.id === id ? { ...x, status: "done", message: "Upload verified & queued for processing ✅", percent: 100 } : x))
+        prev.map((x) => (x.id === id ? { ...x, status: "done", message: "Upload complete ✅ Processing started. Redirecting you to edit details…", percent: 100 } : x))
       );
+      const finalVideoId = init.videoId;
+      if (finalVideoId) {
+        setTimeout(() => {
+          window.location.href = `/${locale}/dashboard/videos/${finalVideoId}/edit`;
+        }, 1200);
+      }
     } catch (e: any) {
       const item = items.find((x) => x.id === id);
       const uploadedBytes = item?.file ? Math.floor((item.percent / 100) * item.file.size) : 0;
 
       // Mark as failed in DB
       if (item?.uploadIntentId) {
-        await fetch(`${api}/uploads/${item.uploadIntentId}/fail`, {
+        await apiFetch(`/uploads/${item.uploadIntentId}/fail`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
-          },
           body: JSON.stringify({ error: e?.message || "Failed", uploadedBytes }),
         }).catch(() => {});
       }
@@ -236,6 +287,11 @@ export function UploadManager({ locale }: { locale: string }) {
           x.id === id ? { ...x, status: "failed", message: e?.message || "Failed" } : x
         )
       );
+      if ((e?.message || "").includes("Session expired")) {
+        setTimeout(() => {
+          window.location.href = `/${locale}/login`;
+        }, 400);
+      }
     } finally {
       delete cancels.current[id];
     }
@@ -261,13 +317,28 @@ export function UploadManager({ locale }: { locale: string }) {
       <div className="rounded-xl border p-4 space-y-3">
         <div className="text-sm font-medium">Upload (Locale: {locale})</div>
 
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Video draft ID</label>
+        <div className="text-[11px] text-muted-foreground">
+          Add optional details now (you can edit everything after upload), then choose your video file.
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-3">
           <input
-            className="w-full rounded-xl border p-2 text-sm"
-            value={videoId}
-            onChange={(e) => setVideoId(e.target.value)}
-            placeholder="paste videoId"
+            className="rounded-xl border p-2 text-sm"
+            placeholder="Title (optional)"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <input
+            className="rounded-xl border p-2 text-sm"
+            placeholder="Tagline (optional)"
+            value={tagline}
+            onChange={(e) => setTagline(e.target.value)}
+          />
+          <input
+            className="rounded-xl border p-2 text-sm md:col-span-3"
+            placeholder="Description (optional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
           />
         </div>
 

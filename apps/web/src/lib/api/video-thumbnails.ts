@@ -32,17 +32,8 @@ export async function uploadCustomThumbnail(videoId: string, file: File) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const token = localStorage.getItem("access_token");
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
-
-  const api = process.env.NEXT_PUBLIC_API_URL!;
-  const res = await fetch(`${api}/creator/videos/${videoId}/thumbnails/upload`, {
+  const res = await apiFetch(`/creator/videos/${videoId}/thumbnails/upload`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
     body: formData,
   });
 

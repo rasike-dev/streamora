@@ -1,3 +1,5 @@
+import { apiFetch } from "../api";
+
 export type CreateShareLinkResponse = {
   code: string;
   shortUrl: string;
@@ -7,15 +9,9 @@ export type CreateShareLinkResponse = {
 export async function createOrGetShareLink(
   videoId: string,
 ): Promise<CreateShareLinkResponse> {
-  const api = process.env.NEXT_PUBLIC_API_URL!;
-  const token = localStorage.getItem('access_token');
-
-  const res = await fetch(`${api}/videos/${videoId}/share`, {
+  const res = await apiFetch(`/videos/${videoId}/share`, {
     method: 'POST',
     credentials: 'include',
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
   });
 
   if (!res.ok) {

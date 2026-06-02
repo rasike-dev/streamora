@@ -7,6 +7,8 @@ import { VideoScheduleEditor } from "@/components/videos/VideoScheduleEditor";
 import { CopyShareLinkButton } from "@/components/CopyShareLinkButton";
 import { CopyEmbedCodeButton } from "@/components/CopyEmbedCodeButton";
 import { resubmitCreatorVideo } from "@/lib/api/creator-videos";
+import { apiFetch } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth/tokens";
 import Link from "next/link";
 
 type Translation = {
@@ -49,7 +51,7 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
   const api = process.env.NEXT_PUBLIC_API_URL!;
   const params = useParams();
   const locale = propLocale || (params.locale as string) || "en";
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const token = getAccessToken();
 
   const [video, setVideo] = useState<VideoDraft | null>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -74,9 +76,7 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
     if (!token) return;
 
     // Load video draft
-    fetch(`${api}/creator/videos/${videoId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    apiFetch(`/creator/videos/${videoId}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         setVideo(data);
@@ -149,12 +149,8 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
     setMessage("");
 
     try {
-      const res = await fetch(`${api}/creator/videos/${videoId}`, {
+      const res = await apiFetch(`/creator/videos/${videoId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           translations: Object.values(formData).filter(
             (t) => t.title || t.description || t.tagline
@@ -169,8 +165,8 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
         throw new Error(errorText);
       }
 
-      setMessage("Draft saved ✅");
-      setTimeout(() => setMessage(""), 2000);
+      setMessage("Draft saved successfully ✅");
+      setTimeout(() => setMessage(""), 5000);
     } catch (e: any) {
       setMessage(`Failed to save: ${e.message}`);
     } finally {
@@ -192,11 +188,8 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
     setMessage("");
 
     try {
-      const res = await fetch(`${api}/creator/videos/${videoId}/submit`, {
+      const res = await apiFetch(`/creator/videos/${videoId}/submit`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!res.ok) {
@@ -226,6 +219,10 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
     video.status
   );
   const canSubmit = video.status === "READY";
+  const submitDisabledReason =
+    video.status === "READY"
+      ? ""
+      : `Submit is available only when status is READY. Current status: ${video.status}.`;
 
   const currentTranslation = formData[activeLocale] || formData.en;
 
@@ -235,6 +232,18 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
         <h2 className="text-lg font-semibold">Edit Draft</h2>
         <div className="text-xs text-muted-foreground">Status: {video.status}</div>
       </div>
+
+      {message && (
+        <div
+          className={`sticky top-2 z-20 rounded-xl border px-3 py-2 text-sm shadow-sm backdrop-blur ${
+            message.includes("✅")
+              ? "border-green-300 bg-green-50/95 text-green-700 dark:border-green-800 dark:bg-green-950/95 dark:text-green-300"
+              : "border-red-300 bg-red-50/95 text-red-700 dark:border-red-800 dark:bg-red-950/95 dark:text-red-300"
+          }`}
+        >
+          {message}
+        </div>
+      )}
 
       {video?.status === "REJECTED" && (
         <div className="space-y-4">
@@ -269,8 +278,8 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
                 await resubmitCreatorVideo(video.id);
                 setMessage("✅ Video resubmitted for moderation");
                 // Reload video data
-                const res = await fetch(`${api}/creator/videos/${videoId}`, {
-                  headers: { Authorization: `Bearer ${token}` },
+                const res = await apiFetch(`/creator/videos/${videoId}`, {
+                  cache: "no-store",
                 });
                 if (res.ok) {
                   const data = await res.json();
@@ -469,14 +478,10 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
           value={(video.visibility as any) || 'PRIVATE'}
           onUpdate={() => {
             // Reload video data to get updated visibility
-            if (token) {
-              fetch(`${api}/creator/videos/${videoId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              })
-                .then((r) => r.json())
-                .then((data) => setVideo(data))
-                .catch(() => {});
-            }
+            apiFetch(`/creator/videos/${videoId}`, { cache: "no-store" })
+              .then((r) => r.json())
+              .then((data) => setVideo(data))
+              .catch(() => {});
           }}
         />
       )}
@@ -500,15 +505,18 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
           {saving ? "Saving..." : "Save Draft"}
         </button>
 
-        {canSubmit && (
-          <button
-            className="rounded-xl border px-4 py-2 text-sm bg-blue-500 text-white hover:bg-blue-600"
-            onClick={submitForModeration}
-            disabled={saving}
-          >
-            Submit for Approval
-          </button>
-        )}
+        <button
+          className={`rounded-xl border px-4 py-2 text-sm ${
+            canSubmit
+              ? "bg-blue-500 text-white hover:bg-blue-600"
+              : "bg-gray-100 text-gray-500 cursor-not-allowed dark:bg-gray-900 dark:text-gray-400"
+          }`}
+          onClick={submitForModeration}
+          disabled={saving || !canSubmit}
+          title={!canSubmit ? submitDisabledReason : undefined}
+        >
+          Submit for Approval
+        </button>
 
         {["READY", "REJECTED", "PENDING_APPROVAL", "APPROVED", "PUBLISHED"].includes(
           video.status
@@ -535,11 +543,12 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
         )}
       </div>
 
-      {message && (
-        <div className={`text-sm ${message.includes("✅") ? "text-green-600" : "text-red-600"}`}>
-          {message}
+      {!canSubmit && (
+        <div className="text-xs text-muted-foreground">
+          {submitDisabledReason}
         </div>
       )}
+
     </div>
   );
 }

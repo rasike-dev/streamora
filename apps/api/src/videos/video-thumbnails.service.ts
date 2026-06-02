@@ -8,6 +8,8 @@ import { Storage } from '@google-cloud/storage';
 import { randomUUID } from 'crypto';
 
 const THUMBNAIL_EDITABLE_STATUSES = [
+  'DRAFT',
+  'UPLOADED',
   'READY',
   'REJECTED',
   'PENDING_APPROVAL',
