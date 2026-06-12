@@ -1,4 +1,8 @@
-import { getValidAccessToken, refreshAccessToken } from "./auth/tokens";
+import {
+  clearTokens,
+  getValidAccessToken,
+  refreshAccessToken,
+} from "./auth/tokens";
 
 function buildHeaders(init: RequestInit | undefined, token: string | null) {
   const headers = new Headers(init?.headers);
@@ -26,8 +30,24 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       res = await fetch(url, { ...init, headers: buildHeaders(init, refreshed) });
+    } else {
+      clearTokens();
     }
   }
 
   return res;
+}
+
+/** Best-effort parse of NestJS error JSON `{ message: string | string[] }`. */
+export async function readApiError(res: Response): Promise<string> {
+  const raw = await res.text().catch(() => "");
+  if (!raw) return `Request failed (${res.status})`;
+  try {
+    const body = JSON.parse(raw) as { message?: string | string[] };
+    if (Array.isArray(body.message)) return body.message.join(", ");
+    if (typeof body.message === "string") return body.message;
+  } catch {
+    // not JSON
+  }
+  return raw;
 }

@@ -1,6 +1,6 @@
 {
   "app": { "name": "Streamora" },
-  "nav": { "login": "ඇතුල් වන්න", "dashboard": "ඩැෂ්බෝඩ්", "admin": "පරිපාලක" },
+  "nav": { "login": "ඇතුල් වන්න", "logout": "පිටවන්න", "dashboard": "ඩැෂ්බෝඩ්", "admin": "පරිපාලක" },
   "common": {
     "home": "මුල් පිටුව",
     "browseVideos": "වීඩියෝ බලන්න",
@@ -74,6 +74,14 @@
     "jobs": "රැකියා",
     "moderationDescription": "නොපමාව අනුමත කිරීමට අපේක්ෂිත වීඩියෝ සමාලෝචනය කරන්න.",
     "jobsDescription": "සැකසීමේ අසමත් වීම් සහ දෝෂ බලන්න.",
+    "pendingTitle": "අනුමැතිය අපේක්ෂිත",
+    "pendingDescription": "නිර්මාණකරුවන් ඉදිරිපත් කළ සමාලෝචනය සඳහා රැඳී සිටින වීඩියෝ.",
+    "pendingCount": "{count, plural, =0 {රැඳී සිටින වීඩියෝ නැත} one {වීඩියෝ #ක් රැඳී සිටී} other {වීඩියෝ #ක් රැඳී සිටී}}",
+    "pendingEmpty": "දැනට අනුමැතිය සඳහා රැඳී සිටින වීඩියෝ නැත.",
+    "openModeration": "පරීක්ෂණ පෝලිම විවෘත කරන්න",
+    "untitledVideo": "(ශීර්ෂකය නැත)",
+    "uploaderHidden": "උඩුගත කරන්නා සඟවා ඇත",
+    "revision": "සංශෝධනය {version}",
     "needSignIn": "මෙම මෙවලම් වලට පරිපාලක ලෙස ඇතුල් වන්න.",
     "forbidden": "පරිපාලක ප්‍රවේශය සීමා කර ඇත."
   },
@@ -138,7 +146,10 @@
   "moderationPage": {
     "title": "පරීක්ෂණය",
     "backAdmin": "පරිපාලක වෙත ආපසු",
-    "emptyQueue": "මෙම දර්ශනයේ වීඩියෝ නැත."
+    "emptyQueue": "මෙම දර්ශනයේ වීඩියෝ නැත.",
+    "approve": "අනුමත කරන්න",
+    "publish": "ප්‍රකාශනය කරන්න",
+    "reject": "ප්‍රතික්ෂේප කරන්න"
   },
   "jobsPage": {
     "title": "රැකියා",

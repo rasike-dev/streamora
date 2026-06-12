@@ -2,18 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getValidAccessToken } from "@/lib/auth/tokens";
+import { getValidAccessToken, logout } from "@/lib/auth/tokens";
 
 export function AuthNavLink({
   locale,
-  label,
+  loginLabel,
+  logoutLabel,
   className,
 }: {
   locale: string;
-  label: string;
+  loginLabel: string;
+  logoutLabel: string;
   className: string;
 }) {
-  const [showLogin, setShowLogin] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -21,13 +23,13 @@ export function AuthNavLink({
     const sync = async () => {
       // Attempts a silent refresh when the access token is stale.
       const token = await getValidAccessToken();
-      if (active) setShowLogin(!token);
+      if (active) setIsAuthenticated(Boolean(token));
     };
 
     sync();
 
     const onExpired = () => {
-      if (active) setShowLogin(true);
+      if (active) setIsAuthenticated(false);
     };
     window.addEventListener("auth:expired", onExpired);
 
@@ -37,11 +39,21 @@ export function AuthNavLink({
     };
   }, []);
 
-  if (!showLogin) return null;
+  if (isAuthenticated) {
+    return (
+      <button
+        type="button"
+        className={className}
+        onClick={() => logout(locale)}
+      >
+        {logoutLabel}
+      </button>
+    );
+  }
 
   return (
     <Link href={`/${locale}/login`} className={className}>
-      {label}
+      {loginLabel}
     </Link>
   );
 }

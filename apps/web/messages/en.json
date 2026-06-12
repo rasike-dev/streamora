@@ -1,6 +1,6 @@
 {
   "app": { "name": "Streamora" },
-  "nav": { "login": "Login", "dashboard": "Dashboard", "admin": "Admin" },
+  "nav": { "login": "Login", "logout": "Logout", "dashboard": "Dashboard", "admin": "Admin" },
   "common": {
     "home": "Home",
     "browseVideos": "Browse videos",
@@ -74,6 +74,14 @@
     "jobs": "Jobs",
     "moderationDescription": "Review and approve pending videos.",
     "jobsDescription": "View processing failures and errors.",
+    "pendingTitle": "Pending approval",
+    "pendingDescription": "Videos creators submitted and are waiting for review.",
+    "pendingCount": "{count, plural, =0 {No videos waiting} one {# video waiting} other {# videos waiting}}",
+    "pendingEmpty": "No videos are waiting for approval right now.",
+    "openModeration": "Open moderation queue",
+    "untitledVideo": "(no title)",
+    "uploaderHidden": "Uploader hidden",
+    "revision": "Revision {version}",
     "needSignIn": "Sign in as an admin to access these tools.",
     "forbidden": "Admin access is restricted."
   },
@@ -138,7 +146,10 @@
   "moderationPage": {
     "title": "Moderation",
     "backAdmin": "Back to admin",
-    "emptyQueue": "No videos in this view."
+    "emptyQueue": "No videos in this view.",
+    "approve": "Approve",
+    "publish": "Publish",
+    "reject": "Reject"
   },
   "jobsPage": {
     "title": "Jobs",

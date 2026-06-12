@@ -8,6 +8,14 @@ import { PageFrame, PageHeading, UserBanner } from "@/components/layout";
 import { apiFetch } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth/tokens";
 
+type PendingVideo = {
+  id: string;
+  title: string | null;
+  uploaderName: string | null;
+  createdAt: string;
+  moderationVersion?: number;
+};
+
 export default function AdminPage() {
   const tAdmin = useTranslations("adminHub");
   const tCommon = useTranslations("common");
@@ -18,6 +26,7 @@ export default function AdminPage() {
   const [access, setAccess] = useState<
     "loading" | "allowed" | "unauthorized" | "forbidden" | "network"
   >("loading");
+  const [pending, setPending] = useState<PendingVideo[]>([]);
 
   useEffect(() => {
     const validateAdminAccess = async () => {
@@ -33,6 +42,13 @@ export default function AdminPage() {
 
         if (res.ok) {
           setAccess("allowed");
+          const queueRes = await apiFetch(
+            `/admin/moderation/queue?status=PENDING_APPROVAL`,
+            { cache: "no-store" },
+          );
+          if (queueRes.ok) {
+            setPending(await queueRes.json());
+          }
           return;
         }
 
@@ -111,19 +127,68 @@ export default function AdminPage() {
           }}
         />
       ) : (
-        <div className="space-y-3">
-          <Link href={`/${locale}/admin/moderation`} className={tile}>
-            <div className="text-sm font-medium">{tAdmin("moderation")}</div>
-            <div className="text-xs text-muted-foreground">
-              {tAdmin("moderationDescription")}
+        <div className="space-y-6">
+          <section className="rounded-2xl border border-black/10 bg-black/[0.02] p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold">{tAdmin("pendingTitle")}</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {tAdmin("pendingDescription")}
+                </p>
+              </div>
+              <span className="rounded-full border border-black/10 px-3 py-1 text-xs font-medium dark:border-white/15">
+                {tAdmin("pendingCount", { count: pending.length })}
+              </span>
             </div>
-          </Link>
-          <Link href={`/${locale}/admin/jobs`} className={tile}>
-            <div className="text-sm font-medium">{tAdmin("jobs")}</div>
-            <div className="text-xs text-muted-foreground">
-              {tAdmin("jobsDescription")}
-            </div>
-          </Link>
+
+            {pending.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground">
+                {tAdmin("pendingEmpty")}
+              </p>
+            ) : (
+              <ul className="mt-4 space-y-2">
+                {pending.slice(0, 5).map((video) => (
+                  <li
+                    key={video.id}
+                    className="rounded-xl border border-black/10 px-3 py-2 text-sm dark:border-white/10"
+                  >
+                    <div className="font-medium">
+                      {video.title ?? tAdmin("untitledVideo")}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {video.uploaderName ?? tAdmin("uploaderHidden")} •{" "}
+                      {new Date(video.createdAt).toLocaleString()}
+                      {video.moderationVersion && video.moderationVersion > 1
+                        ? ` • ${tAdmin("revision", { version: video.moderationVersion })}`
+                        : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <Link
+              href={`/${locale}/admin/moderation`}
+              className="mt-4 inline-flex rounded-xl border border-black/15 px-4 py-2 text-sm font-medium hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              {tAdmin("openModeration")}
+            </Link>
+          </section>
+
+          <div className="space-y-3">
+            <Link href={`/${locale}/admin/moderation`} className={tile}>
+              <div className="text-sm font-medium">{tAdmin("moderation")}</div>
+              <div className="text-xs text-muted-foreground">
+                {tAdmin("moderationDescription")}
+              </div>
+            </Link>
+            <Link href={`/${locale}/admin/jobs`} className={tile}>
+              <div className="text-sm font-medium">{tAdmin("jobs")}</div>
+              <div className="text-xs text-muted-foreground">
+                {tAdmin("jobsDescription")}
+              </div>
+            </Link>
+          </div>
         </div>
       )}
     </PageFrame>

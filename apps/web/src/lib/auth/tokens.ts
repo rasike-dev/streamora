@@ -29,6 +29,28 @@ export function clearTokens() {
   window.dispatchEvent(new Event("auth:expired"));
 }
 
+/** Clears local session and redirects through Keycloak end-session. */
+export function logout(locale = "en") {
+  if (typeof window === "undefined") return;
+
+  clearTokens();
+
+  const issuer = process.env.NEXT_PUBLIC_KEYCLOAK_ISSUER;
+  const clientId = process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+  if (!issuer || !clientId || !appUrl) {
+    window.location.href = `/${locale}`;
+    return;
+  }
+
+  const postLogoutRedirectUri = encodeURIComponent(`${appUrl}/${locale}`);
+  window.location.href =
+    `${issuer}/protocol/openid-connect/logout` +
+    `?client_id=${encodeURIComponent(clientId)}` +
+    `&post_logout_redirect_uri=${postLogoutRedirectUri}`;
+}
+
 function decodeExp(token: string): number | null {
   try {
     const payload = JSON.parse(atob(token.split(".")[1] || ""));

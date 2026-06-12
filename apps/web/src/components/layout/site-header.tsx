@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { LandingHeaderActions } from '@/components/landing-header-actions';
+import { AdminNavLink } from '@/components/layout/admin-nav-link';
 import { AuthNavLink } from '@/components/layout/auth-nav-link';
 
 export async function SiteHeader({ locale }: { locale: string }) {
@@ -33,7 +34,17 @@ export async function SiteHeader({ locale }: { locale: string }) {
           <Link href={`/${locale}/dashboard`} className={`inline-flex ${navBtn}`}>
             {t('dashboard')}
           </Link>
-          <AuthNavLink locale={locale} label={tNav('login')} className={navBtn} />
+          <AdminNavLink
+            locale={locale}
+            label={tNav('admin')}
+            className={`inline-flex ${navBtn}`}
+          />
+          <AuthNavLink
+            locale={locale}
+            loginLabel={tNav('login')}
+            logoutLabel={tNav('logout')}
+            className={navBtn}
+          />
           <LandingHeaderActions />
         </nav>
       </div>

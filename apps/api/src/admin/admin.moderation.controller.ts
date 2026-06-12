@@ -75,6 +75,12 @@ export class AdminModerationController {
       throw new NotFoundException('Video not found');
     }
 
+    if (video.status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException(
+        `Only videos in PENDING_APPROVAL can be approved (current: ${video.status})`,
+      );
+    }
+
     const now = new Date();
 
     // If scheduled time has passed, publish immediately
@@ -154,9 +160,28 @@ export class AdminModerationController {
 
   @Post('admin/videos/:id/publish')
   async publish(@Param('id') id: string) {
+    const video = await this.prisma.video.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+
+    if (!video) {
+      throw new NotFoundException('Video not found');
+    }
+
+    if (video.status !== 'APPROVED' && video.status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException(
+        `Only approved or pending videos can be published (current: ${video.status})`,
+      );
+    }
+
     const v = await this.prisma.video.update({
       where: { id },
-      data: { status: 'PUBLISHED', visibility: 'PUBLIC' },
+      data: {
+        status: 'PUBLISHED',
+        visibility: 'PUBLIC',
+        publishedAt: new Date(),
+      },
     });
 
     return { ok: true, id: v.id, status: v.status };

@@ -8,8 +8,8 @@ import {
   PageHeading,
   UserBanner,
 } from "@/components/layout";
-import { apiFetch } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth/tokens";
+import { apiFetch, readApiError } from "@/lib/api";
+import { getValidAccessToken } from "@/lib/auth/tokens";
 import { takedownVideo, archiveVideo, restoreVideo } from "@/lib/api/admin-governance";
 
 type Row = {
@@ -45,7 +45,8 @@ export default function ModerationPage() {
   const [statusFilter, setStatusFilter] = useState<string>("PENDING_APPROVAL");
 
   const load = useCallback(async () => {
-    if (!getAccessToken()) {
+    const token = await getValidAccessToken();
+    if (!token) {
       setErr("UNAUTHORIZED");
       setRows([]);
       return;
@@ -58,7 +59,7 @@ export default function ModerationPage() {
       } else if (res.status === 403) {
         setErr("FORBIDDEN");
       } else {
-        setErr(await res.text());
+        setErr(await readApiError(res));
       }
       setRows([]);
       return;
@@ -73,7 +74,11 @@ export default function ModerationPage() {
   }, [load]);
 
   const act = async (id: string, action: "approve" | "reject" | "publish") => {
-    if (!getAccessToken()) return;
+    const token = await getValidAccessToken();
+    if (!token) {
+      setErr("UNAUTHORIZED");
+      return;
+    }
 
     if (action === "reject") {
       setRejectingId(id);
@@ -84,15 +89,28 @@ export default function ModerationPage() {
       method: "POST",
     });
     if (!res.ok) {
-      alert(await res.text());
+      if (res.status === 401) {
+        setErr("UNAUTHORIZED");
+        return;
+      }
+      if (res.status === 403) {
+        setErr("FORBIDDEN");
+        return;
+      }
+      setErr(await readApiError(res));
       return;
     }
     await load();
   };
 
   const confirmReject = async (id: string) => {
-    if (!getAccessToken() || !rejectReason.trim()) {
-      alert("Please provide a rejection reason");
+    const token = await getValidAccessToken();
+    if (!token) {
+      setErr("UNAUTHORIZED");
+      return;
+    }
+    if (!rejectReason.trim()) {
+      setErr("Rejection reason is required");
       return;
     }
 
@@ -103,9 +121,17 @@ export default function ModerationPage() {
         note: rejectNote || undefined,
       }),
     });
-    
+
     if (!res.ok) {
-      alert(await res.text());
+      if (res.status === 401) {
+        setErr("UNAUTHORIZED");
+        return;
+      }
+      if (res.status === 403) {
+        setErr("FORBIDDEN");
+        return;
+      }
+      setErr(await readApiError(res));
       return;
     }
     
@@ -271,15 +297,23 @@ export default function ModerationPage() {
                 {r.status === "PENDING_APPROVAL" && (
                   <>
                     <button className="rounded-xl border px-3 py-1 text-sm" onClick={() => act(r.id, "approve")}>
-                      Approve
+                      {tMod("approve")}
                     </button>
                     <button className="rounded-xl border px-3 py-1 text-sm" onClick={() => act(r.id, "publish")}>
-                      Publish
+                      {tMod("publish")}
                     </button>
                     <button className="rounded-xl border px-3 py-1 text-sm" onClick={() => act(r.id, "reject")}>
-                      Reject
+                      {tMod("reject")}
                     </button>
                   </>
+                )}
+                {r.status === "APPROVED" && (
+                  <button
+                    className="rounded-xl border px-3 py-1 text-sm bg-foreground text-background hover:opacity-90"
+                    onClick={() => act(r.id, "publish")}
+                  >
+                    {tMod("publish")}
+                  </button>
                 )}
                 {r.status === "PUBLISHED" && (
                   <>
@@ -293,7 +327,10 @@ export default function ModerationPage() {
                         }
                         const note = prompt("Admin notes (optional):");
                         try {
-                          if (!getAccessToken()) return;
+                          if (!(await getValidAccessToken())) {
+                            setErr("UNAUTHORIZED");
+                            return;
+                          }
                           await takedownVideo(r.id, reason.trim(), note?.trim() || undefined);
                           await load();
                         } catch (e: any) {
@@ -309,7 +346,10 @@ export default function ModerationPage() {
                         const reason = prompt("Archive reason (optional):");
                         const note = prompt("Admin notes (optional):");
                         try {
-                          if (!getAccessToken()) return;
+                          if (!(await getValidAccessToken())) {
+                            setErr("UNAUTHORIZED");
+                            return;
+                          }
                           await archiveVideo(r.id, reason?.trim() || undefined, note?.trim() || undefined);
                           await load();
                         } catch (e: any) {
@@ -327,7 +367,10 @@ export default function ModerationPage() {
                     onClick={async () => {
                       const note = prompt("Restore note (optional):");
                       try {
-                        if (!getAccessToken()) return;
+                        if (!(await getValidAccessToken())) {
+                          setErr("UNAUTHORIZED");
+                          return;
+                        }
                         await restoreVideo(r.id, note?.trim() || undefined);
                         await load();
                       } catch (e: any) {
