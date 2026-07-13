@@ -1,4 +1,5 @@
-import './globals.css';
+import { ClerkProvider } from "@clerk/nextjs";
+import "./globals.css";
 
 export default function RootLayout({
   children,
@@ -7,7 +8,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        <ClerkProvider>{children}</ClerkProvider>
+      </body>
     </html>
   );
 }

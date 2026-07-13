@@ -20,14 +20,14 @@ export class VideosController {
 
   @Post('draft')
   async createDraft(@Req() req: any, @Body() body: any) {
-    const keycloakSub = req.user.sub; // keycloak sub
-    return this.videosService.createDraft(keycloakSub, body, req.requestId);
+    const externalId = req.user.sub; // keycloak sub
+    return this.videosService.createDraft(externalId, body, req.requestId);
   }
 
   @Get(':id')
   async getDraft(@Req() req: any, @Param('id') id: string) {
-    const keycloakSub = req.user.sub;
-    return this.videosService.getDraft(id, keycloakSub);
+    const externalId = req.user.sub;
+    return this.videosService.getDraft(id, externalId);
   }
 
   @Patch(':id')
@@ -36,25 +36,25 @@ export class VideosController {
     @Param('id') id: string,
     @Body() body: UpdateVideoDraftDto | any,
   ) {
-    const keycloakSub = req.user.sub;
+    const externalId = req.user.sub;
     // Support both old format (for backward compatibility) and new format
     if (body.translations || body.channels || body.tags) {
-      return this.videosService.updateDraftFull(id, keycloakSub, body);
+      return this.videosService.updateDraftFull(id, externalId, body);
     }
     // Old format (locale-based single translation)
-    return this.videosService.updateDraft(id, keycloakSub, body);
+    return this.videosService.updateDraft(id, externalId, body);
   }
 
   @Post(':id/submit')
   async submitForModeration(@Req() req: any, @Param('id') id: string) {
-    const keycloakSub = req.user.sub;
-    return this.videosService.submitForModeration(id, keycloakSub);
+    const externalId = req.user.sub;
+    return this.videosService.submitForModeration(id, externalId);
   }
 
   @Post(':id/resubmit')
   async resubmitVideo(@Req() req: any, @Param('id') id: string) {
-    const keycloakSub = req.user.sub;
-    return this.videosService.resubmitVideo(id, keycloakSub);
+    const externalId = req.user.sub;
+    return this.videosService.resubmitVideo(id, externalId);
   }
 
   @Get()
@@ -67,8 +67,8 @@ export class VideosController {
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '12',
   ) {
-    const keycloakSub = req.user.sub;
-    const user = await this.videosService.getUserByKeycloakSub(keycloakSub);
+    const externalId = req.user.sub;
+    const user = await this.videosService.getUserByExternalId(externalId);
     if (!user) {
       throw new Error('User not found');
     }

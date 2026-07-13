@@ -20,7 +20,8 @@ Naming convention (recommended): resource labels `app=streamora`, `env=staging|p
 |---------|------|---------------------|
 | PostgreSQL 15 | `5432` | User `streamora`, password `streamora`, database `streamora` |
 | Redis 7 | `6379` | No auth (dev only) |
-| Keycloak 24 (`start-dev`) | `8080` | Admin `admin` / `admin` — **change for anything beyond localhost** |
+
+Auth is handled by **Clerk** (cloud). See [`docs/clerk-setup.md`](../docs/clerk-setup.md).
 
 **Example `DATABASE_URL` for the API** (matches compose):
 
@@ -49,24 +50,29 @@ These are the deployable surfaces described in [`docs/full-context.md`](../docs/
 | Objects | **Cloud Storage** buckets | e.g. originals (private), renditions/thumbnails/captions (CDN or signed) |
 | Async | **Pub/Sub** | Upload/process events, DLQ pattern |
 | Edge | **Cloud CDN + HTTPS LB** | In front of public/object surfaces when HLS/CDN is enabled |
-| Auth | **Keycloak** (self-managed VM/GKE or hosted equivalent) | JWT issuer for API |
+| Auth | **Clerk** (managed) | JWT issuer for API; see [`docs/clerk-setup.md`](../docs/clerk-setup.md) |
 
 ## Secrets
 
 | Approach | Use |
 |----------|-----|
 | **Local** | `.env` files (never commit secrets). |
-| **GCP** | **Secret Manager** for DB URLs, JWT/Webhook secrets, GCS keys, Keycloak client secrets; inject via Cloud Run secrets/env. |
+| **GCP** | **Secret Manager** for DB URLs, Clerk secrets, GCS IAM, Pub/Sub; inject via Cloud Run secrets/env. |
 
-Minimum secrets for deploy: `DATABASE_URL`, Keycloak/OIDC settings, GCS bucket names + IAM workload identity, Pub/Sub topic names.
-
-## CI/CD outline
-
-- **CI**: GitHub Actions runs install → Prisma `generate` → lint → build for `api`, `web`, `worker` (see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)).
-- **CD** (later): push images to Artifact Registry → deploy Cloud Run revisions per environment; run migrations from CI or a dedicated step with Cloud SQL access.
+Minimum secrets for deploy: `DATABASE_URL`, Clerk settings (`CLERK_SECRET_KEY`, `CLERK_JWKS_URL`, `CLERK_JWT_ISSUER`), GCS bucket names + IAM workload identity, Pub/Sub topic names, `SCHEDULER_SECRET`.
 
 ## Scripts
 
 | Script | Purpose |
 |--------|---------|
 | [`scripts/verify-local.sh`](./scripts/verify-local.sh) | Quick checks: Docker available, `docker compose config` valid |
+| [`scripts/provision-staging.sh`](./scripts/provision-staging.sh) | Provision GCP staging resources (Cloud SQL, GCS, Pub/Sub, Artifact Registry) |
+| [`scripts/deploy-staging.sh`](./scripts/deploy-staging.sh) | Deploy Cloud Run services from Artifact Registry images |
+| [`scripts/setup-domain.sh`](./scripts/setup-domain.sh) | Map custom domains and document CDN/env updates |
+
+See [`env.production.example`](./env.production.example) for production environment variables.
+
+## CI/CD
+
+- **CI**: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — lint, build, test on push/PR
+- **CD**: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) — build images, push to Artifact Registry, deploy Cloud Run, migrate DB

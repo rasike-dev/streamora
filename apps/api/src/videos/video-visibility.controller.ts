@@ -16,10 +16,10 @@ export class CreatorVideoVisibilityController {
     @Body() dto: UpdateVideoVisibilityDto,
     @Req() req: any,
   ) {
-    const keycloakSub = req.user.sub;
+    const externalId = req.user.sub;
     return this.visibilityService.updateVisibility(
       videoId,
-      keycloakSub,
+      externalId,
       dto.visibility,
     );
   }

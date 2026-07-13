@@ -8,6 +8,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { getRolesFromRequest } from '../auth/auth-user.util';
 import { JwtGuard } from '../auth/jwt.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { GcsService } from '../storage/gcs.service';
@@ -31,7 +32,7 @@ export class VideoReprocessController {
   async reprocess(@Req() req: any, @Param('id') videoId: string) {
     const sub = req.user?.sub;
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub: sub },
+      where: { externalId: sub },
     });
     if (!user) throw new NotFoundException('User not found');
 
@@ -40,7 +41,7 @@ export class VideoReprocessController {
     });
     if (!video) throw new NotFoundException('Video not found');
 
-    const roles: string[] = req.user?.realm_access?.roles ?? [];
+    const roles = getRolesFromRequest(req);
     const isAdmin = roles.includes('ADMIN');
     if (!isAdmin && video.uploaderId && video.uploaderId !== user.id) {
       throw new ForbiddenException('Not allowed');

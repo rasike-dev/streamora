@@ -63,9 +63,45 @@ enum UploadStatus {
   FAILED
 }
 
+enum MediaKind {
+  IMAGE
+  DOCUMENT
+}
+
+enum MediaStatus {
+  DRAFT
+  UPLOADED
+  PROCESSING
+  PROCESSING_FAILED
+  READY
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PUBLISHED
+  TAKEDOWN
+  ARCHIVED
+}
+
+enum UploadTargetKind {
+  VIDEO
+  MEDIA
+}
+
+enum MediaAuditAction {
+  MEDIA_CREATED
+  MEDIA_SUBMITTED
+  MEDIA_APPROVED
+  MEDIA_REJECTED
+  MEDIA_RESUBMITTED
+  MEDIA_PUBLISHED
+  MEDIA_TAKEDOWN
+  MEDIA_ARCHIVED
+  MEDIA_RESTORED
+}
+
 model User {
   id            String   @id @default(cuid())
-  keycloakSub   String   @unique
+  externalId    String   @unique
   email         String?
   username      String?
   displayName   String?
@@ -76,9 +112,11 @@ model User {
   roles         UserRole[]
   creatorProfile CreatorProfile?
   videos        Video[] @relation("UploaderVideos")
+  mediaItems    MediaItem[] @relation("UploaderMedia")
   shortLinks    ShortLink[]
+  mediaShortLinks MediaShortLink[]
 
-  @@index([keycloakSub])
+  @@index([externalId])
 }
 
 model UserRole {
@@ -115,6 +153,7 @@ model Channel {
   updatedAt DateTime @updatedAt
 
   videos    VideoChannel[]
+  mediaItems MediaItemChannel[]
   translations ChannelTranslation[]
 
   @@index([slug])
@@ -143,6 +182,7 @@ model Tag {
   updatedAt DateTime @updatedAt
 
   videos     VideoTag[]
+  mediaItems MediaItemTag[]
   translations TagTranslation[]
 
   @@index([slug])
@@ -260,11 +300,14 @@ model VideoTag {
 
 model UploadIntent {
   id          String       @id @default(cuid())
-  videoId     String
+  targetKind  UploadTargetKind @default(VIDEO)
+  videoId     String?
+  mediaItemId String?
   objectKey   String
   bucket      String
   contentType String
   sizeBytes   BigInt
+  originalFilename String?
   status      UploadStatus @default(INITIATED)
 
   // Progress tracking
@@ -276,9 +319,12 @@ model UploadIntent {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video     Video?     @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  mediaItem MediaItem? @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
 
   @@index([videoId])
+  @@index([mediaItemId])
+  @@index([targetKind])
   @@index([status])
 }
 
@@ -353,9 +399,10 @@ enum JobStatus {
 
 model ProcessingJob {
   id            String    @id @default(cuid())
-  videoId       String
+  videoId       String?
+  mediaItemId   String?
   uploadIntentId String?
-  jobType       String    // "THUMBS_HLS"
+  jobType       String    // "THUMBS_HLS" | "IMAGE_DERIVATIVES" | "DOC_THUMBNAIL"
   status        JobStatus @default(PENDING)
   attempts      Int       @default(0)
   lastError     String?
@@ -365,9 +412,11 @@ model ProcessingJob {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video     Video?     @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  mediaItem MediaItem? @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
 
   @@index([videoId])
+  @@index([mediaItemId])
   @@index([status])
 }
 
@@ -468,6 +517,143 @@ model VideoAuditLog {
 enum SubtitleFormat {
   VTT
   SRT
+}
+
+model MediaItem {
+  id              String          @id @default(cuid())
+  slug            String          @unique
+  kind            MediaKind
+  status          MediaStatus     @default(DRAFT)
+  visibility      VideoVisibility @default(PRIVATE)
+  scheduledAt     DateTime?
+  publishedAt     DateTime?
+  scheduleRequested Boolean         @default(false)
+  uploaderId      String?
+  uploaderVisible Boolean         @default(false)
+
+  rejectionReason String?
+  rejectionNote   String?
+  rejectedAt      DateTime?
+  rejectedBy      String?
+  resubmittedAt   DateTime?
+  moderationVersion Int           @default(1)
+
+  takedownReason  String?
+  takedownNote    String?
+  takenDownAt     DateTime?
+  takenDownBy     String?
+  archivedReason  String?
+  archivedNote    String?
+  archivedAt      DateTime?
+  archivedBy      String?
+
+  views           Int             @default(0)
+  downloads       Int             @default(0)
+  lastViewedAt    DateTime?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  uploader        User?           @relation("UploaderMedia", fields: [uploaderId], references: [id], onDelete: SetNull)
+  translations    MediaItemTranslation[]
+  channels        MediaItemChannel[]
+  tags            MediaItemTag[]
+  uploadIntents   UploadIntent[]
+  asset           MediaAsset?
+  jobs            ProcessingJob[]
+  shortLinks      MediaShortLink[]
+  auditLogs       MediaAuditLog[]
+
+  @@index([status])
+  @@index([visibility])
+  @@index([kind])
+  @@index([uploaderId])
+}
+
+model MediaItemTranslation {
+  id          String @id @default(cuid())
+  mediaItemId String
+  locale      String
+  title       String?
+  description String?
+  tagline     String?
+
+  mediaItem MediaItem @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaItemId, locale])
+  @@index([locale])
+}
+
+model MediaItemChannel {
+  mediaItemId String
+  channelId   String
+
+  mediaItem MediaItem @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
+  channel   Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@id([mediaItemId, channelId])
+  @@index([channelId])
+}
+
+model MediaItemTag {
+  mediaItemId String
+  tagId       String
+
+  mediaItem MediaItem @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
+  tag       Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([mediaItemId, tagId])
+  @@index([tagId])
+}
+
+model MediaAsset {
+  id               String   @id @default(cuid())
+  mediaItemId      String   @unique
+  bucket           String
+  originalKey      String
+  contentType      String
+  sizeBytes        BigInt
+  originalFilename String?
+  width            Int?
+  height           Int?
+  pageCount        Int?
+  previewKey       String?
+  thumbnailKey     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  mediaItem MediaItem @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
+
+  @@index([bucket])
+}
+
+model MediaShortLink {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  mediaItemId     String
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  mediaItem     MediaItem @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
+  createdByUser User?     @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([mediaItemId])
+  @@index([code])
+}
+
+model MediaAuditLog {
+  id          String           @id @default(cuid())
+  mediaItemId String
+  action      MediaAuditAction
+  actorUserId String
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+
+  mediaItem MediaItem @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
+
+  @@index([mediaItemId, createdAt])
+  @@index([action, createdAt])
 }
 
 model VideoSubtitle {

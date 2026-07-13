@@ -1,5 +1,29 @@
 import { apiFetch } from "../api";
 
+function emptyCreatorAnalyticsOverview(days: number): CreatorAnalyticsOverview {
+  return {
+    rangeDays: days,
+    totals: {
+      views: 0,
+      uniqueViewers: 0,
+      playStarts: 0,
+      completions: 0,
+      completionRate: 0,
+    },
+    trafficSources: {
+      directViews: 0,
+      shareViews: 0,
+      channelViews: 0,
+      tagViews: 0,
+      searchViews: 0,
+      externalViews: 0,
+      unknownViews: 0,
+    },
+    dailyTrend: [],
+    topVideos: [],
+  };
+}
+
 export type CreatorAnalyticsOverview = {
   rangeDays: number;
   totals: {
@@ -53,6 +77,9 @@ export async function getCreatorAnalyticsOverview(
   if (!res.ok) {
     if (res.status === 401) {
       throw new Error('UNAUTHORIZED');
+    }
+    if (res.status === 404) {
+      return emptyCreatorAnalyticsOverview(days);
     }
     throw new Error('FETCH_FAILED');
   }

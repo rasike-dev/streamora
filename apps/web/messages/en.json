@@ -4,8 +4,12 @@
   "common": {
     "home": "Home",
     "browseVideos": "Browse videos",
+    "browseMedia": "Browse media",
     "dashboard": "Dashboard",
     "upload": "Upload",
+    "uploadVideo": "Upload video",
+    "uploadMedia": "Upload media",
+    "myMedia": "My media",
     "login": "Login",
     "admin": "Admin",
     "back": "Back",
@@ -53,7 +57,20 @@
     "title": "Upload",
     "description": "Publish new videos from your creator account.",
     "intro": "Select a file and fill in metadata. Drafts can be edited before publishing.",
-    "envMissing": "Sign-in is not configured. Set NEXT_PUBLIC_KEYCLOAK_ISSUER, NEXT_PUBLIC_KEYCLOAK_CLIENT_ID, and NEXT_PUBLIC_APP_URL."
+    "alsoUploadMedia": "Need to share an image or document instead?",
+    "uploadMediaLink": "Go to image & document upload",
+    "envMissing": "Sign-in is not configured. Set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY."
+  },
+  "mediaBrowsePage": {
+    "title": "Discover media",
+    "description": "Browse public images and documents from verified creators.",
+    "empty": "No published media yet.",
+    "emptyHint": "Check back later for new content.",
+    "loadError": "Couldn't load the media catalog.",
+    "views": "views",
+    "previous": "Previous",
+    "next": "Next",
+    "pageOf": "Page {page} of {total}"
   },
   "authCallback": {
     "successTitle": "Signed in",
@@ -192,36 +209,90 @@
     "retryHint": "Try signing in again or check your network connection."
   },
   "landing": {
-    "metaTitle": "Streamora — Creator-verified video",
-    "metaDescription": "Discover curated videos from verified creators. Upload, share, and watch on a platform built for trust and quality playback.",
+    "metaTitle": "Streamora — Official video platform",
+    "metaDescription": "The official video platform for stakeholders. Upload, get reviewed, publish, and share with audiences worldwide.",
     "navBrowse": "Browse videos",
-    "heroTitle": "Video you can trust, from creators you’ll recognize",
-    "heroSubtitle": "Browse public catalogs, upload your story, and reach viewers with moderated, high-quality playback across devices.",
+    "heroTitle": "The official video platform for our stakeholders",
+    "heroSubtitle": "Upload your story, work with our editorial team, and reach audiences with moderated, high-quality playback.",
     "ctaBrowse": "Browse videos",
-    "ctaCreatorLogin": "Creator login",
+    "ctaCreatorLogin": "Stakeholder login",
+    "howItWorksTitle": "How it works",
+    "stepLabel": "Step {number}",
+    "step1Title": "Get invited",
+    "step1Body": "Request access from the platform team. Once invited, sign in and start uploading.",
+    "step2Title": "Upload & edit",
+    "step2Body": "Upload video files, add titles and descriptions in your language, and choose thumbnails.",
+    "step3Title": "Submit for review",
+    "step3Body": "When your video is ready, submit it. Our team reviews before anything goes public.",
+    "step4Title": "Publish & share",
+    "step4Body": "After approval, your video goes live. Share links on WhatsApp, social media, and more.",
     "featuresTitle": "Why Streamora",
-    "feature1Title": "Creator-verified catalog",
-    "feature1Body": "Public listings spotlight moderated content so viewers see consistent quality and authentic creators.",
+    "feature1Title": "Editorial trust",
+    "feature1Body": "Every public video is reviewed. Viewers see consistent quality from verified stakeholders.",
     "feature2Title": "Built for creators",
-    "feature2Body": "Draft uploads, manage visibility, and grow your channel with tools tuned for serious publishing workflows.",
+    "feature2Body": "Resumable uploads, multilingual metadata, and analytics tuned for serious publishing.",
     "feature3Title": "Smooth playback",
-    "feature3Body": "Adaptive streaming delivers reliable viewing on mobile and desktop without sacrificing clarity.",
+    "feature3Body": "Adaptive streaming delivers reliable viewing on mobile and desktop.",
+    "contactTitle": "Request stakeholder access",
+    "contactBody": "Streamora is invite-only. Contact the platform team to get started as a content stakeholder.",
+    "contactCta": "Email the team",
+    "contactSubject": "Streamora stakeholder access request",
     "footerBrowse": "Browse videos",
-    "footerUpload": "Upload",
-    "footerDashboard": "Dashboard",
-    "footerAdmin": "Admin",
+    "footerLogin": "Login",
+    "footerTerms": "Terms",
+    "footerPrivacy": "Privacy",
     "footerCopyright": "© {year} Streamora. All rights reserved."
+  },
+  "legal": {
+    "termsNav": "Terms of Service",
+    "privacyNav": "Privacy Policy",
+    "cookiesNav": "Cookies",
+    "lastUpdated": "Last updated: July 2026",
+    "termsTitle": "Terms of Service",
+    "privacyTitle": "Privacy Policy",
+    "cookiesTitle": "Cookie Policy",
+    "cookiesIntro": "Streamora uses cookies and similar technologies to keep you signed in and to understand how the platform is used.",
+    "cookies": {
+      "sessionTitle": "Session cookies",
+      "sessionBody": "Clerk authentication sets session cookies so you stay signed in securely. These are essential for stakeholder and admin access.",
+      "analyticsTitle": "Analytics",
+      "analyticsBody": "When viewers watch published videos, we record anonymous playback events (views, completions) to help creators understand reach. We do not sell personal data."
+    },
+    "terms": {
+      "s1Title": "Acceptance",
+      "s1Body": "By using Streamora you agree to these terms. The platform is operated by the organization that hosts it. Access is by invitation only.",
+      "s2Title": "Content ownership",
+      "s2Body": "You retain ownership of videos you upload. By submitting content you grant the platform a license to host, transcode, display, and distribute it as part of the service.",
+      "s3Title": "Moderation",
+      "s3Body": "All content is subject to review before publication. The platform may reject, remove, or take down content that violates policy or applicable law.",
+      "s4Title": "Acceptable use",
+      "s4Body": "Do not upload unlawful, infringing, or harmful material. Do not attempt to bypass security, quotas, or moderation workflows.",
+      "s5Title": "Limitation of liability",
+      "s5Body": "The platform is provided as-is. To the extent permitted by law, the operator is not liable for indirect damages arising from use of the service."
+    },
+    "privacy": {
+      "s1Title": "Who we are",
+      "s1Body": "Streamora is a video publishing platform for invited stakeholders. This policy describes how we handle information when you use the service.",
+      "s2Title": "Information we collect",
+      "s2Body": "We collect account information from Clerk (email, name), videos and metadata you upload, and anonymous playback analytics on published content.",
+      "s3Title": "How we use data",
+      "s3Body": "Data is used to operate the platform, moderate content, provide analytics to creators, and improve reliability. We do not sell personal information.",
+      "s4Title": "Your rights",
+      "s4Body": "You may request access, correction, or deletion of your account data by contacting the platform operator. Published content may remain subject to editorial retention policies."
+    }
   },
   "login": {
     "title": "Login",
     "cta": "Continue with Streamora Login",
-    "subtitle": "Sign in with your Streamora account.",
-    "envMissing": "Authentication environment variables are missing. Contact your administrator."
+    "subtitle": "Sign in with your invited stakeholder account.",
+    "envMissing": "Authentication is not configured. Contact your administrator."
   },
   "dashboard": {
     "title": "Creator Dashboard",
     "createDraft": "Create Draft",
     "myVideos": "My Videos",
+    "myMedia": "My Media",
+    "uploadMedia": "Upload media",
     "form": {
       "title": "Title",
       "description": "Description",
@@ -230,5 +301,28 @@
       "tags": "Tags (comma separated)",
       "save": "Save Draft"
     }
+  },
+  "mediaUploadPage": {
+    "title": "Upload image or document",
+    "description": "Add standalone media for stakeholder review and sharing.",
+    "intro": "Choose image or document, add metadata, then upload. Media goes through the same approval flow as videos.",
+    "alsoUploadVideo": "Uploading a video instead?",
+    "uploadVideoLink": "Go to video upload"
+  },
+  "mediaPage": {
+    "title": "Media",
+    "description": "Images and documents you have uploaded.",
+    "empty": "No media yet. Upload an image or document to get started.",
+    "myMedia": "My Media",
+    "uploadMedia": "Upload media",
+    "editMedia": "Edit media",
+    "edit": "Edit",
+    "views": "views",
+    "downloads": "downloads",
+    "submitForReview": "Submit for review",
+    "resubmit": "Resubmit",
+    "getShareLink": "Get share link",
+    "preview": "Preview",
+    "download": "Download"
   }
 }

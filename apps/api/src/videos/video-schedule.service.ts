@@ -18,11 +18,11 @@ export class CreatorVideoScheduleService {
 
   async updateSchedule(
     videoId: string,
-    keycloakSub: string,
+    externalId: string,
     scheduledAt: string | null,
   ) {
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
     });
 
     if (!user) {

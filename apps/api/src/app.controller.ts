@@ -8,11 +8,16 @@ import {
 import { JwtGuard } from './auth/jwt.guard';
 import { Roles } from './auth/roles.decorator';
 import { RolesGuard } from './auth/roles.guard';
+import { getRolesFromRequest } from './auth/auth-user.util';
 import { PrismaService } from './prisma/prisma.service';
+import { ClerkService } from './auth/clerk.service';
 
 @Controller()
 export class AppController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private clerk: ClerkService,
+  ) {}
 
   @Get('health')
   health() {
@@ -27,32 +32,35 @@ export class AppController {
   @Get('me')
   @UseGuards(JwtGuard)
   async me(@Req() req: any) {
-    const keycloakSub = req.user?.sub;
+    const externalId = req.user?.sub;
     const email = req.user?.email;
     const username = req.user?.preferred_username;
-    const keycloakRoles = req.user?.realm_access?.roles ?? [];
 
-    if (!keycloakSub) {
+    if (!externalId) {
       throw new BadRequestException('Invalid user sub');
     }
 
-    // Upsert user
+    const tokenRoles = getRolesFromRequest(req);
+    const roles =
+      tokenRoles.length > 0
+        ? tokenRoles
+        : await this.clerk.ensureDefaultRoles(externalId);
+
     const user = await this.prisma.user.upsert({
-      where: { keycloakSub },
+      where: { externalId },
       update: {
         email: email || undefined,
         username: username || undefined,
         displayName: username || undefined,
       },
       create: {
-        keycloakSub,
+        externalId,
         email: email || undefined,
         username: username || undefined,
         displayName: username || undefined,
       },
     });
 
-    // Ensure creator profile exists
     await this.prisma.creatorProfile.upsert({
       where: { userId: user.id },
       update: {},
@@ -62,20 +70,18 @@ export class AppController {
       },
     });
 
-    // Sync roles
     const existingRoles = await this.prisma.userRole.findMany({
       where: { userId: user.id },
     });
 
     const existingRoleNames = existingRoles.map((r) => r.role);
-    const rolesToAdd = keycloakRoles.filter(
+    const rolesToAdd = roles.filter(
       (r: string) => !existingRoleNames.includes(r),
     );
     const rolesToRemove = existingRoleNames.filter(
-      (r) => !keycloakRoles.includes(r),
+      (r) => !roles.includes(r),
     );
 
-    // Add new roles
     if (rolesToAdd.length > 0) {
       await this.prisma.userRole.createMany({
         data: rolesToAdd.map((role: string) => ({
@@ -85,7 +91,6 @@ export class AppController {
       });
     }
 
-    // Remove old roles
     if (rolesToRemove.length > 0) {
       await this.prisma.userRole.deleteMany({
         where: {
@@ -95,7 +100,6 @@ export class AppController {
       });
     }
 
-    // Get final roles
     const finalRoles = await this.prisma.userRole.findMany({
       where: { userId: user.id },
       select: { role: true },
@@ -103,7 +107,7 @@ export class AppController {
 
     return {
       id: user.id,
-      sub: keycloakSub,
+      sub: externalId,
       username: user.username,
       email: user.email,
       roles: finalRoles.map((r) => r.role),

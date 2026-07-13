@@ -21,18 +21,6 @@ services:
     volumes:
       - redis_data:/data
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:24.0
-    container_name: streamora-keycloak
-    command: ["start-dev"]
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-
 volumes:
   postgres_data:
   redis_data:

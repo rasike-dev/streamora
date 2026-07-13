@@ -1,139 +1,106 @@
-const ACCESS_TOKEN_KEY = "access_token";
-const REFRESH_TOKEN_KEY = "refresh_token";
+const JWT_TEMPLATE = "streamora-api";
 
-// Refresh slightly before the real expiry to avoid racing the clock.
-const EXPIRY_SKEW_SECONDS = 30;
+type TokenOptions = {
+  skipCache?: boolean;
+  reloadSession?: boolean;
+};
 
-export function getAccessToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+type TokenGetter = (options?: TokenOptions) => Promise<string | null>;
+
+let registeredGetToken: TokenGetter | null = null;
+
+type ClerkSession = {
+  getToken: (opts?: {
+    template?: string;
+    skipCache?: boolean;
+  }) => Promise<string | null>;
+  reload: () => Promise<void>;
+};
+
+type ClerkClient = {
+  loaded?: boolean;
+  session?: ClerkSession | null;
+};
+
+function getClerk(): ClerkClient | undefined {
+  if (typeof window === "undefined") return undefined;
+  return (window as typeof window & { Clerk?: ClerkClient }).Clerk;
 }
 
-export function getRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
-}
+async function waitForClerkLoaded(timeoutMs = 10000): Promise<ClerkClient | null> {
+  const deadline = Date.now() + timeoutMs;
 
-export function setTokens(accessToken: string, refreshToken?: string | null) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  if (refreshToken !== undefined && refreshToken !== null) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  while (Date.now() < deadline) {
+    const clerk = getClerk();
+    if (clerk?.loaded) return clerk;
+    await new Promise((resolve) => setTimeout(resolve, 50));
   }
+
+  return getClerk() ?? null;
+}
+
+async function getTokenFromClerkClient(
+  options?: TokenOptions,
+): Promise<string | null> {
+  const clerk = await waitForClerkLoaded();
+  if (!clerk?.session) return null;
+
+  if (options?.reloadSession) {
+    try {
+      await clerk.session.reload();
+    } catch {
+      // Best-effort refresh before fetching a template token.
+    }
+  }
+
+  try {
+    const templateToken = await clerk.session.getToken({
+      template: JWT_TEMPLATE,
+      skipCache: options?.skipCache,
+    });
+    if (templateToken) return templateToken;
+  } catch {
+    // Fall through to the default session JWT.
+  }
+
+  try {
+    return await clerk.session.getToken({ skipCache: options?.skipCache });
+  } catch {
+    return null;
+  }
+}
+
+/** Registers Clerk's useAuth().getToken bridge from AuthSync. */
+export function registerClerkTokenGetter(getter: TokenGetter | null) {
+  registeredGetToken = getter;
+}
+
+export async function getApiToken(options?: TokenOptions): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+
+  if (registeredGetToken) {
+    const token = await registeredGetToken(options);
+    if (token) return token;
+  }
+
+  return getTokenFromClerkClient(options);
+}
+
+/** Backward-compatible aliases used by existing components. */
+export const getAccessToken = getApiToken;
+export const getValidAccessToken = getApiToken;
+
+/** @deprecated Clerk manages tokens; no-op for legacy callers. */
+export function setTokens(_accessToken: string, _refreshToken?: string | null) {
+  // no-op
+}
+
+/** @deprecated Use Clerk sign-out via UserButton. */
+export function logout(locale = "en") {
+  clearTokens();
+  window.location.href = `/${locale}`;
 }
 
 export function clearTokens() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
   window.dispatchEvent(new Event("auth:expired"));
-}
-
-/** Clears local session and redirects through Keycloak end-session. */
-export function logout(locale = "en") {
-  if (typeof window === "undefined") return;
-
-  clearTokens();
-
-  const issuer = process.env.NEXT_PUBLIC_KEYCLOAK_ISSUER;
-  const clientId = process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-
-  if (!issuer || !clientId || !appUrl) {
-    window.location.href = `/${locale}`;
-    return;
-  }
-
-  const postLogoutRedirectUri = encodeURIComponent(`${appUrl}/${locale}`);
-  window.location.href =
-    `${issuer}/protocol/openid-connect/logout` +
-    `?client_id=${encodeURIComponent(clientId)}` +
-    `&post_logout_redirect_uri=${postLogoutRedirectUri}`;
-}
-
-function decodeExp(token: string): number | null {
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1] || ""));
-    return typeof payload?.exp === "number" ? payload.exp : null;
-  } catch {
-    return null;
-  }
-}
-
-export function isTokenExpired(token: string, skewSeconds = EXPIRY_SKEW_SECONDS): boolean {
-  const exp = decodeExp(token);
-  if (!exp) return true;
-  return exp * 1000 <= Date.now() + skewSeconds * 1000;
-}
-
-// Single-flight guard so concurrent requests don't all hit Keycloak at once.
-let refreshPromise: Promise<string | null> | null = null;
-
-export function refreshAccessToken(): Promise<string | null> {
-  if (refreshPromise) return refreshPromise;
-  refreshPromise = doRefresh().finally(() => {
-    refreshPromise = null;
-  });
-  return refreshPromise;
-}
-
-async function doRefresh(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    clearTokens();
-    return null;
-  }
-
-  const issuer = process.env.NEXT_PUBLIC_KEYCLOAK_ISSUER;
-  const clientId = process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID;
-  if (!issuer || !clientId) {
-    return null;
-  }
-
-  const body = new URLSearchParams();
-  body.set("grant_type", "refresh_token");
-  body.set("client_id", clientId);
-  body.set("refresh_token", refreshToken);
-
-  try {
-    const res = await fetch(`${issuer}/protocol/openid-connect/token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-    });
-
-    if (!res.ok) {
-      // Refresh token is invalid/expired -> force re-login.
-      clearTokens();
-      return null;
-    }
-
-    const data = await res.json();
-    if (!data.access_token) {
-      clearTokens();
-      return null;
-    }
-
-    setTokens(data.access_token, data.refresh_token ?? refreshToken);
-    return data.access_token as string;
-  } catch {
-    // Network blip: keep tokens so a later attempt can succeed.
-    return null;
-  }
-}
-
-/**
- * Returns a non-expired access token, refreshing proactively when needed.
- * Returns null when the session cannot be recovered (caller should redirect to login).
- */
-export async function getValidAccessToken(): Promise<string | null> {
-  const token = getAccessToken();
-  if (token && !isTokenExpired(token)) {
-    return token;
-  }
-  if (getRefreshToken()) {
-    return refreshAccessToken();
-  }
-  if (token) clearTokens();
-  return null;
 }

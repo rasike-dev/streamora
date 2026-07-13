@@ -29,8 +29,8 @@ export class CreatorVideoThumbnailsController {
 
   @Get()
   async list(@Param('id') videoId: string, @Req() req: any) {
-    const keycloakSub = req.user.sub;
-    return this.thumbnailsService.list(videoId, keycloakSub);
+    const externalId = req.user.sub;
+    return this.thumbnailsService.list(videoId, externalId);
   }
 
   @Post(':thumbnailId/select')
@@ -39,8 +39,8 @@ export class CreatorVideoThumbnailsController {
     @Param('thumbnailId') thumbnailId: string,
     @Req() req: any,
   ) {
-    const keycloakSub = req.user.sub;
-    return this.thumbnailsService.select(videoId, thumbnailId, keycloakSub);
+    const externalId = req.user.sub;
+    return this.thumbnailsService.select(videoId, thumbnailId, externalId);
   }
 
   @Post('upload')
@@ -58,7 +58,7 @@ export class CreatorVideoThumbnailsController {
       throw new BadRequestException('Thumbnail file is required');
     }
 
-    const keycloakSub = req.user.sub;
-    return this.thumbnailsService.uploadCustom(videoId, keycloakSub, file);
+    const externalId = req.user.sub;
+    return this.thumbnailsService.uploadCustom(videoId, externalId, file);
   }
 }

@@ -22,11 +22,11 @@ cp .env.example .env
 cp apps/web/.env.example apps/web/.env.local
 cp apps/worker/.env.example apps/worker/.env
 ```
-Edit `.env` and `apps/web/.env.local` if your ports or Keycloak realm/client names differ. The API resolves `DATABASE_URL` and related vars from the **repository root** `.env` (see `apps/api` `ConfigModule` `envFilePath`). The web app uses **`apps/web/.env.local`** for `NEXT_PUBLIC_*` variables.
+Edit `.env` and `apps/web/.env.local` with your Clerk keys (see [`docs/clerk-setup.md`](docs/clerk-setup.md)). The API resolves `DATABASE_URL` and related vars from the **repository root** `.env`. The web app uses **`apps/web/.env.local`** for `NEXT_PUBLIC_*` variables.
 
 Set `UPLOAD_RESUMABLE_ORIGIN` in `.env` to your web origin (local default: `http://localhost:3000`). The API uses this value when creating Google Cloud Storage resumable upload sessions.
 
-3. Start local infrastructure (Postgres, Redis, Keycloak):
+3. Start local infrastructure (Postgres, Redis):
 ```bash
 docker compose up -d
 ```
@@ -48,7 +48,7 @@ pnpm --filter api exec dotenv -e ../../.env -- prisma migrate dev
 pnpm --filter api exec dotenv -e ../../.env -- prisma db seed
 ```
 
-6. Keycloak: ensure your realm and OIDC client match `KEYCLOAK_ISSUER` and `NEXT_PUBLIC_KEYCLOAK_*` (realm export / setup is described in the project docs under `docs/`).
+6. Clerk: configure your application and JWT template per [`docs/clerk-setup.md`](docs/clerk-setup.md).
 
 7. Start all services:
 ```bash

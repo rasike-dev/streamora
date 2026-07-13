@@ -20,9 +20,7 @@ export async function generateMetadata({
   return {
     title,
     description,
-    alternates: {
-      canonical,
-    },
+    alternates: { canonical },
     openGraph: {
       title,
       description,
@@ -31,11 +29,7 @@ export async function generateMetadata({
       type: "website",
       locale,
     },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-    },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 
@@ -43,11 +37,20 @@ export default async function HomePage({ params }: PageProps) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "landing" });
   const year = new Date().getFullYear();
+  const contactEmail =
+    process.env.NEXT_PUBLIC_CONTACT_EMAIL || "hello@streamora.app";
 
   const featureBlocks = [
     ["feature1Title", "feature1Body"],
     ["feature2Title", "feature2Body"],
     ["feature3Title", "feature3Body"],
+  ] as const;
+
+  const steps = [
+    ["step1Title", "step1Body"],
+    ["step2Title", "step2Body"],
+    ["step3Title", "step3Body"],
+    ["step4Title", "step4Body"],
   ] as const;
 
   return (
@@ -70,7 +73,7 @@ export default async function HomePage({ params }: PageProps) {
               {t("ctaBrowse")}
             </Link>
             <Link
-              href={`/${locale}/login`}
+              href={`/${locale}/sign-in`}
               className="inline-flex w-full min-w-[12rem] items-center justify-center rounded-xl border border-black/15 px-6 py-3 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06] sm:w-auto"
             >
               {t("ctaCreatorLogin")}
@@ -79,9 +82,25 @@ export default async function HomePage({ params }: PageProps) {
         </section>
 
         <section className="mt-20 border-t border-black/10 pt-16 dark:border-white/10">
-          <h2 className="text-center text-lg font-semibold">
-            {t("featuresTitle")}
-          </h2>
+          <h2 className="text-center text-lg font-semibold">{t("howItWorksTitle")}</h2>
+          <ol className="mx-auto mt-10 grid max-w-4xl gap-6 sm:grid-cols-2">
+            {steps.map(([titleKey, bodyKey], index) => (
+              <li
+                key={titleKey}
+                className="rounded-2xl border border-black/10 p-6 dark:border-white/10"
+              >
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t("stepLabel", { number: index + 1 })}
+                </span>
+                <h3 className="mt-2 font-medium">{t(titleKey)}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{t(bodyKey)}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="mt-20 border-t border-black/10 pt-16 dark:border-white/10">
+          <h2 className="text-center text-lg font-semibold">{t("featuresTitle")}</h2>
           <ul className="mt-10 grid gap-8 sm:grid-cols-3">
             {featureBlocks.map(([titleKey, bodyKey]) => (
               <li
@@ -94,34 +113,33 @@ export default async function HomePage({ params }: PageProps) {
             ))}
           </ul>
         </section>
+
+        <section className="mx-auto mt-20 max-w-2xl rounded-2xl border border-black/10 bg-black/[0.02] p-8 text-center dark:border-white/10 dark:bg-white/[0.03]">
+          <h2 className="text-lg font-semibold">{t("contactTitle")}</h2>
+          <p className="mt-3 text-sm text-muted-foreground">{t("contactBody")}</p>
+          <a
+            href={`mailto:${contactEmail}?subject=${encodeURIComponent(t("contactSubject"))}`}
+            className="mt-6 inline-flex items-center justify-center rounded-xl bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90"
+          >
+            {t("contactCta")}
+          </a>
+        </section>
       </main>
 
       <footer className="border-t border-black/10 py-8 dark:border-white/10">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:flex-row sm:items-center sm:justify-between">
           <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-            <Link
-              href={`/${locale}/videos`}
-              className="transition hover:text-foreground"
-            >
+            <Link href={`/${locale}/videos`} className="transition hover:text-foreground">
               {t("footerBrowse")}
             </Link>
-            <Link
-              href={`/${locale}/upload`}
-              className="transition hover:text-foreground"
-            >
-              {t("footerUpload")}
+            <Link href={`/${locale}/sign-in`} className="transition hover:text-foreground">
+              {t("footerLogin")}
             </Link>
-            <Link
-              href={`/${locale}/dashboard`}
-              className="transition hover:text-foreground"
-            >
-              {t("footerDashboard")}
+            <Link href={`/${locale}/legal/terms`} className="transition hover:text-foreground">
+              {t("footerTerms")}
             </Link>
-            <Link
-              href={`/${locale}/admin`}
-              className="transition hover:text-foreground"
-            >
-              {t("footerAdmin")}
+            <Link href={`/${locale}/legal/privacy`} className="transition hover:text-foreground">
+              {t("footerPrivacy")}
             </Link>
           </nav>
           <p className="text-xs text-muted-foreground">

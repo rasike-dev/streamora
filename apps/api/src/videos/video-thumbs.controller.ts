@@ -11,7 +11,7 @@ export class VideoThumbsController {
   async thumbs(@Req() req: any, @Param('id') videoId: string) {
     const sub = req.user?.sub;
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub: sub },
+      where: { externalId: sub },
     });
     const video = await this.prisma.video.findUnique({
       where: { id: videoId },

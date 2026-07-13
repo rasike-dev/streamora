@@ -7,6 +7,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { getRolesFromRequest } from '../auth/auth-user.util';
 import { JwtGuard } from '../auth/jwt.guard';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -19,23 +20,30 @@ export class UploadStatusController {
   async status(@Req() req: any, @Param('id') id: string) {
     const sub = req.user?.sub;
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub: sub },
+      where: { externalId: sub },
     });
     if (!user) throw new NotFoundException('User not found');
 
     const intent = await this.prisma.uploadIntent.findUnique({
       where: { id },
-      include: { video: true },
+      include: { video: true, mediaItem: true },
     });
     if (!intent) throw new NotFoundException('Upload intent not found');
 
-    // Owner/admin check
-    const roles: string[] = req.user?.realm_access?.roles ?? [];
+    const roles = getRolesFromRequest(req);
     const isAdmin = roles.includes('ADMIN');
 
-    if (
+    if (intent.targetKind === 'MEDIA') {
+      if (
+        !isAdmin &&
+        intent.mediaItem?.uploaderId &&
+        intent.mediaItem.uploaderId !== user.id
+      ) {
+        throw new ForbiddenException('Not allowed');
+      }
+    } else if (
       !isAdmin &&
-      intent.video.uploaderId &&
+      intent.video?.uploaderId &&
       intent.video.uploaderId !== user.id
     ) {
       throw new ForbiddenException('Not allowed');
@@ -43,7 +51,10 @@ export class UploadStatusController {
 
     return {
       id: intent.id,
+      targetKind: intent.targetKind,
       videoId: intent.videoId,
+      mediaItemId: intent.mediaItemId,
+      kind: intent.mediaItem?.kind ?? null,
       status: intent.status,
       bucket: intent.bucket,
       objectKey: intent.objectKey,

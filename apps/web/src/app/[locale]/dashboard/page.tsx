@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useAuth } from "@clerk/nextjs";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -10,14 +11,14 @@ import {
   PageHeading,
   UserBanner,
 } from "@/components/layout";
+import { DashboardQuickActions } from "@/components/dashboard-quick-actions";
+import { apiFetch } from "@/lib/api";
 import { getCreatorAnalyticsOverview } from "@/lib/api/creator-analytics";
 
 const card =
   "rounded-2xl border border-black/10 bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.04]";
 const panel =
   "rounded-2xl border border-black/10 bg-black/[0.02] p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04]";
-const btnGhost =
-  "rounded-xl border border-black/15 px-4 py-2 text-sm hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]";
 const toggleInactive =
   "px-4 py-2 text-sm transition hover:bg-black/[0.04] dark:hover:bg-white/[0.06]";
 const toggleActive =
@@ -39,6 +40,7 @@ function StatCard({
 }
 
 export default function DashboardPage() {
+  const { isLoaded, isSignedIn } = useAuth();
   const t = useTranslations("dashboard");
   const tShell = useTranslations("dashboardShell");
   const tErrors = useTranslations("errors");
@@ -55,10 +57,25 @@ export default function DashboardPage() {
   );
 
   useEffect(() => {
+    if (!isLoaded || !isSignedIn) {
+      setLoading(false);
+      if (isLoaded && !isSignedIn) {
+        setFailKind("unauthorized");
+      }
+      return;
+    }
+
     const load = async () => {
       setLoading(true);
       setFailKind(null);
       try {
+        const meRes = await apiFetch("/me");
+        if (!meRes.ok) {
+          setFailKind(meRes.status === 401 ? "unauthorized" : "network");
+          setData(null);
+          return;
+        }
+
         const result = await getCreatorAnalyticsOverview(days, locale);
         setData(result);
       } catch (e: any) {
@@ -74,9 +91,9 @@ export default function DashboardPage() {
     };
 
     load();
-  }, [days, locale]);
+  }, [isLoaded, isSignedIn, days, locale]);
 
-  if (loading) {
+  if (!isLoaded || loading) {
     return (
       <PageFrame>
         <PageHeading title={t("title")} />
@@ -93,7 +110,16 @@ export default function DashboardPage() {
           backHref={`/${locale}`}
           backLabel={tCommon("backToHome")}
         />
-        <UserBanner
+        <div className="space-y-6">
+          <DashboardQuickActions
+            locale={locale}
+            bulkUploads={tShell("bulkUploads")}
+            myVideos={t("myVideos")}
+            myMedia={t("myMedia")}
+            newUpload={tShell("newUpload")}
+            uploadMedia={t("uploadMedia")}
+          />
+          <UserBanner
           variant="error"
           title={
             failKind === "unauthorized"
@@ -102,8 +128,8 @@ export default function DashboardPage() {
           }
           body={tShell("retryHint")}
           primaryAction={
-            failKind === "unauthorized"
-              ? { href: `/${locale}/login`, label: tNav("login") }
+            failKind === "unauthorized" && !isSignedIn
+              ? { href: `/${locale}/sign-in`, label: tNav("login") }
               : { href: `/${locale}/dashboard`, label: tCommon("retry") }
           }
           secondaryAction={{
@@ -111,6 +137,7 @@ export default function DashboardPage() {
             label: tCommon("home"),
           }}
         />
+        </div>
       </PageFrame>
     );
   }
@@ -139,6 +166,17 @@ export default function DashboardPage() {
           </div>
         }
       />
+
+      <div className="mb-6">
+        <DashboardQuickActions
+          locale={locale}
+          bulkUploads={tShell("bulkUploads")}
+          myVideos={t("myVideos")}
+          myMedia={t("myMedia")}
+          newUpload={tShell("newUpload")}
+          uploadMedia={t("uploadMedia")}
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <StatCard label={tShell("views")} value={data.totals.views} />
@@ -244,18 +282,6 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
-
-      <div className="mt-8 flex flex-wrap gap-3">
-        <Link href={`/${locale}/dashboard/uploads`} className={btnGhost}>
-          {tShell("bulkUploads")}
-        </Link>
-        <Link href={`/${locale}/dashboard/videos`} className={btnGhost}>
-          {t("myVideos")}
-        </Link>
-        <Link href={`/${locale}/upload`} className={btnGhost}>
-          {tShell("newUpload")}
-        </Link>
-      </div>
     </PageFrame>
   );
 }

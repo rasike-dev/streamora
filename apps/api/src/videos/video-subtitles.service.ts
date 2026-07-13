@@ -19,9 +19,9 @@ export class VideoSubtitlesService {
    * references the internal `User.id`. Resolve the internal id before any
    * ownership comparison.
    */
-  private async resolveInternalUserId(keycloakSub: string): Promise<string> {
+  private async resolveInternalUserId(externalId: string): Promise<string> {
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
       select: { id: true },
     });
     if (!user) {

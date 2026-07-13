@@ -19,8 +19,8 @@ export class ShortLinksController {
   @Post('videos/:id/share')
   @UseGuards(JwtGuard, RolesGuard)
   async createOrGetShortLink(@Param('id') videoId: string, @Req() req: any) {
-    const keycloakSub = req.user.sub;
-    const user = await this.shortLinksService.getUserByKeycloakSub(keycloakSub);
+    const externalId = req.user.sub;
+    const user = await this.shortLinksService.getUserByExternalId(externalId);
     if (!user) {
       throw new NotFoundException('User not found');
     }

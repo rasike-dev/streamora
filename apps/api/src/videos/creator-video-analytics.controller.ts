@@ -23,8 +23,8 @@ export class CreatorVideoAnalyticsController {
     @Req() req: any,
     @Query('days') days = '30',
   ) {
-    const keycloakSub = req.user.sub;
-    const user = await this.analyticsService.getUserByKeycloakSub(keycloakSub);
+    const externalId = req.user.sub;
+    const user = await this.analyticsService.getUserByExternalId(externalId);
     if (!user) {
       throw new NotFoundException('User not found');
     }

@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { LandingHeaderActions } from '@/components/landing-header-actions';
 import { AdminNavLink } from '@/components/layout/admin-nav-link';
 import { AuthNavLink } from '@/components/layout/auth-nav-link';
+import { CreatorNavLinks } from '@/components/layout/creator-nav-links';
 
 export async function SiteHeader({ locale }: { locale: string }) {
   const t = await getTranslations({ locale, namespace: 'common' });
@@ -28,9 +29,21 @@ export async function SiteHeader({ locale }: { locale: string }) {
           >
             {t('browseVideos')}
           </Link>
-          <Link href={`/${locale}/upload`} className={`inline-flex ${navBtn}`}>
-            {t('upload')}
+          <Link
+            href={`/${locale}/media`}
+            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
+          >
+            {t('browseMedia')}
           </Link>
+          <Link href={`/${locale}/upload`} className={`inline-flex ${navBtn}`}>
+            {t('uploadVideo')}
+          </Link>
+          <CreatorNavLinks
+            locale={locale}
+            myMediaLabel={t('myMedia')}
+            uploadMediaLabel={t('uploadMedia')}
+            className={`inline-flex ${navBtn}`}
+          />
           <Link href={`/${locale}/dashboard`} className={`inline-flex ${navBtn}`}>
             {t('dashboard')}
           </Link>

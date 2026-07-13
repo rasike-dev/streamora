@@ -4,8 +4,12 @@
   "common": {
     "home": "முகப்பு",
     "browseVideos": "வீடியோக்களை உலாவு",
+    "browseMedia": "ஊடகத்தை உலாவு",
     "dashboard": "டாஷ்போர்டு",
     "upload": "பதிவேற்று",
+    "uploadVideo": "வீடியோவை பதிவேற்று",
+    "uploadMedia": "ஊடகத்தை பதிவேற்று",
+    "myMedia": "எனது ஊடகம்",
     "login": "உள்நுழைவு",
     "admin": "நிர்வாகம்",
     "back": "பின்",
@@ -53,7 +57,20 @@
     "title": "பதிவேற்றம்",
     "description": "உங்கள் உருவாக்குநர் கணக்கில் இருந்து புதிய வீடியோக்களை வெளியிடவும்.",
     "intro": "கோப்பைத் தேர்ந்தெடுத்து உள்ளமைவுத் தகவலை நிரப்பவும். வெளியிடுவதற்கு முன் வரைவுகளைத் திருத்தலாம்.",
-    "envMissing": "உள்நுழைவு கட்டமைக்கப்படவில்லை. NEXT_PUBLIC_KEYCLOAK_ISSUER, NEXT_PUBLIC_KEYCLOAK_CLIENT_ID, NEXT_PUBLIC_APP_URL அமைக்கவும்."
+    "alsoUploadMedia": "படம் அல்லது ஆவணத்தைப் பகிர வேண்டுமா?",
+    "uploadMediaLink": "படம் & ஆவண பதிவேற்றத்திற்குச் செல்லுங்கள்",
+    "envMissing": "உள்நுழைவு கட்டமைக்கப்படவில்லை. NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY மற்றும் CLERK_SECRET_KEY அமைக்கவும்."
+  },
+  "mediaBrowsePage": {
+    "title": "ஊடகத்தைக் கண்டறியுங்கள்",
+    "description": "சரிபார்க்கப்பட்ட உருவாக்குநர்களின் பொது படங்கள் மற்றும் ஆவணங்களை உலாவுங்கள்.",
+    "empty": "வெளியிடப்பட்ட ஊடகம் இன்னும் இல்லை.",
+    "emptyHint": "புதிய உள்ளடக்கத்திற்குப் பின்னர் மீண்டும் பாருங்கள்.",
+    "loadError": "ஊடக அட்டவணையை ஏற்ற முடியவில்லை.",
+    "views": "பார்வைகள்",
+    "previous": "முந்தைய",
+    "next": "அடுத்து",
+    "pageOf": "பக்கம் {page} / {total}"
   },
   "authCallback": {
     "successTitle": "உள்நுழைந்தீர்கள்",
@@ -192,25 +209,77 @@
     "retryHint": "மீண்டும் உள்நுழையவும் அல்லது இணைப்பைச் சரிபார்க்கவும்."
   },
   "landing": {
-    "metaTitle": "Streamora — உருவாக்குநர் சரிபார்க்கப்பட்ட வீடியோ",
-    "metaDescription": "சரிபார்க்கப்பட்ட உருவாக்குநர்களின் வீடியோக்களைக் கண்டறியவும். நம்பிக்கையை அடிப்படையாகக் கொண்ட தளத்தில் பதிவேற்றிப் பாருங்கள்.",
+    "metaTitle": "Streamora — அதிகாரப்பூர்வ வீடியோ தளம்",
+    "metaDescription": "பங்குதாரர்களுக்கான அதிகாரப்பூர்வ வீடியோ தளம். பதிவேற்றம், மதிப்பாய்வு, வெளியீடு, பகிர்வு.",
     "navBrowse": "வீடியோக்களை உலாவு",
-    "heroTitle": "நீங்கள் நம்பும் வீடியோ, அறிந்த உருவாக்குநர்களிடமிருந்து",
-    "heroSubtitle": "பொது தொகுப்புகளை உலாவவும், உங்கள் கதையை பதிவேற்றவும், சாதனங்கள் முழுவதும் தரமான பதிவிடுதலுடன் பார்வையாளர்களை அடையவும்.",
+    "heroTitle": "எங்கள் பங்குதாரர்களுக்கான அதிகாரப்பூர்வ வீடியோ தளம்",
+    "heroSubtitle": "உங்கள் கதையை பதிவேற்றுங்கள், ஆசிரியர் குழுவுடன் வேலை செய்யுங்கள், தரமான பதிவிடுதலுடன் பார்வையாளர்களை அடையுங்கள்.",
     "ctaBrowse": "வீடியோக்களை உலாவு",
-    "ctaCreatorLogin": "உருவாக்குநர் உள்நுழைவு",
+    "ctaCreatorLogin": "பங்குதாரர் உள்நுழைவு",
+    "howItWorksTitle": "எப்படி செயல்படுகிறது",
+    "stepLabel": "படி {number}",
+    "step1Title": "அழைப்பு பெறுங்கள்",
+    "step1Body": "தள குழுவிடம் அணுகல் கோருங்கள். அழைக்கப்பட்ட பிறகு உள்நுழைந்து பதிவேற்றத் தொடங்குங்கள்.",
+    "step2Title": "பதிவேற்றி திருத்துங்கள்",
+    "step2Body": "வீடியோ பதிவேற்றி உங்கள் மொழியில் தலைப்புகள் மற்றும் விளக்கங்களைச் சேர்க்கவும்.",
+    "step3Title": "மதிப்பாய்வுக்கு சமர்ப்பிக்கவும்",
+    "step3Body": "தயாரான போது சமர்ப்பிக்கவும். பொதுவெளியில் வெளியிடுவதற்கு முன் எங்கள் குழு மதிப்பாய்வு செய்கிறது.",
+    "step4Title": "வெளியிட்டு பகிருங்கள்",
+    "step4Body": "அனுமதிக்கப்பட்ட பிறகு வீடியோ நேரலையாகிறது. இணைப்புகளைப் பகிருங்கள்.",
     "featuresTitle": "ஏன் Streamora",
-    "feature1Title": "உருவாக்குநர் சரிபார்க்கப்பட்ட தொகுப்பு",
-    "feature1Body": "பொது பட்டியல்கள் மிதமான உள்ளடக்கத்தை முன்வைக்கின்றன — நம்பகமான தரம் மற்றும் உண்மையான உருவாக்குநர்கள்.",
+    "feature1Title": "ஆசிரியர் நம்பிக்கை",
+    "feature1Body": "ஒவ்வொரு பொது வீடியோவும் மதிப்பாய்வு செய்யப்படுகிறது. பார்வையாளர்களுக்கு சரிபார்க்கப்பட்ட உள்ளடக்கம் கிடைக்கிறது.",
     "feature2Title": "உருவாக்குநர்களுக்காக கட்டமைக்கப்பட்டது",
-    "feature2Body": "வரைவுகளை பதிவேற்றவும், புலனாகும் தன்மையை நிர்வகிக்கவும், சேனலை வளர்க்க சிறந்த கருவிகள்.",
+    "feature2Body": "மீண்டும் தொடங்கக்கூடிய பதிவேற்றங்கள், பலமொழி மெட்டாடேட்டா, பகுப்பாய்வு.",
     "feature3Title": "மென்மையான பின்னணி",
-    "feature3Body": "தகவமைப்பு ஸ்ட்ரீமிங் மொபைலிலும் டெஸ்க்டாப்பிலும் தெளிவை இழக்காமல் நம்பகமான பார்வையைத் தருகிறது.",
+    "feature3Body": "தகவமைப்பு ஸ்ட்ரீமிங் மொபைலிலும் டெஸ்க்டாப்பிலும் நம்பகமான பார்வையைத் தருகிறது.",
+    "contactTitle": "பங்குதாரர் அணுகல் கோருங்கள்",
+    "contactBody": "Streamora அழைப்பு மட்டுமே. உள்ளடக்க பங்குதாரராக தொடங்க குழுவைத் தொடர்பு கொள்ளுங்கள்.",
+    "contactCta": "மின்னஞ்சல் அனுப்புங்கள்",
+    "contactSubject": "Streamora பங்குதாரர் அணுகல் கோரிக்கை",
     "footerBrowse": "வீடியோக்களை உலாவு",
-    "footerUpload": "பதிவேற்று",
-    "footerDashboard": "டாஷ்போர்டு",
-    "footerAdmin": "நிர்வாகம்",
+    "footerLogin": "உள்நுழைவு",
+    "footerTerms": "விதிமுறைகள்",
+    "footerPrivacy": "தனியுரிமை",
     "footerCopyright": "© {year} Streamora. அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை."
+  },
+  "legal": {
+    "termsNav": "Terms of Service",
+    "privacyNav": "Privacy Policy",
+    "cookiesNav": "Cookies",
+    "lastUpdated": "Last updated: July 2026",
+    "termsTitle": "Terms of Service",
+    "privacyTitle": "Privacy Policy",
+    "cookiesTitle": "Cookie Policy",
+    "cookiesIntro": "Streamora uses cookies to keep you signed in and to understand platform usage.",
+    "cookies": {
+      "sessionTitle": "Session cookies",
+      "sessionBody": "Clerk authentication sets session cookies for secure sign-in.",
+      "analyticsTitle": "Analytics",
+      "analyticsBody": "Anonymous playback events are recorded for published videos."
+    },
+    "terms": {
+      "s1Title": "Acceptance",
+      "s1Body": "By using Streamora you agree to these terms. Access is by invitation only.",
+      "s2Title": "Content ownership",
+      "s2Body": "You retain ownership of uploaded videos and grant the platform a license to host and distribute them.",
+      "s3Title": "Moderation",
+      "s3Body": "All content is reviewed before publication.",
+      "s4Title": "Acceptable use",
+      "s4Body": "Do not upload unlawful or harmful material.",
+      "s5Title": "Limitation of liability",
+      "s5Body": "The platform is provided as-is to the extent permitted by law."
+    },
+    "privacy": {
+      "s1Title": "Who we are",
+      "s1Body": "Streamora is a video platform for invited stakeholders.",
+      "s2Title": "Information we collect",
+      "s2Body": "Account data from Clerk, uploaded videos, and anonymous analytics.",
+      "s3Title": "How we use data",
+      "s3Body": "Data is used to operate the platform and provide analytics. We do not sell personal information.",
+      "s4Title": "Your rights",
+      "s4Body": "Contact the platform operator to request access, correction, or deletion."
+    }
   },
   "login": {
     "title": "உள்நுழைவு",
@@ -222,6 +291,8 @@
     "title": "உருவாக்குநர் டாஷ்போர்டு",
     "createDraft": "வரைவு உருவாக்க",
     "myVideos": "எனது வீடியோக்கள்",
+    "myMedia": "எனது ஊடகம்",
+    "uploadMedia": "ஊடகத்தை பதிவேற்று",
     "form": {
       "title": "தலைப்பு",
       "description": "விளக்கம்",
@@ -230,5 +301,28 @@
       "tags": "டேக்ஸ் (கமாவால் பிரிக்கப்பட்ட)",
       "save": "வரைவைச் சேமி"
     }
+  },
+  "mediaUploadPage": {
+    "title": "படம் அல்லது ஆவணத்தை பதிவேற்று",
+    "description": "மதிப்பாய்வு மற்றும் பகிர்வுக்கான ஊடகத்தைச் சேர்க்கவும்.",
+    "intro": "படம் அல்லது ஆவணத்தைத் தேர்ந்தெடுத்து, விவரங்களைச் சேர்த்து பதிவேற்றவும்.",
+    "alsoUploadVideo": "வீடியோவைப் பதிவேற்றுகிறீர்களா?",
+    "uploadVideoLink": "வீடியோ பதிவேற்றத்திற்குச் செல்லுங்கள்"
+  },
+  "mediaPage": {
+    "title": "ஊடகம்",
+    "description": "நீங்கள் பதிவேற்றிய படங்கள் மற்றும் ஆவணங்கள்.",
+    "empty": "ஊடகம் இன்னும் இல்லை. தொடங்க படம் அல்லது ஆவணத்தை பதிவேற்றவும்.",
+    "myMedia": "எனது ஊடகம்",
+    "uploadMedia": "ஊடகத்தை பதிவேற்று",
+    "editMedia": "ஊடகத்தைத் திருத்து",
+    "edit": "திருத்து",
+    "views": "பார்வைகள்",
+    "downloads": "பதிவிறக்கங்கள்",
+    "submitForReview": "மதிப்பாய்வுக்கு அனுப்பு",
+    "resubmit": "மீண்டும் அனுப்பு",
+    "getShareLink": "பகிர்வு இணைப்பு",
+    "preview": "முன்னோட்டம்",
+    "download": "பதிவிறக்கம்"
   }
 }

@@ -1,6 +1,7 @@
-import { NextIntlClientProvider } from 'next-intl';
-import { getMessages, setRequestLocale } from 'next-intl/server';
-import { ThemeProvider } from '@/components/theme-provider';
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages, setRequestLocale } from "next-intl/server";
+import { ThemeProvider } from "@/components/theme-provider";
+import { AuthSync } from "@/components/auth-sync";
 
 export default async function LocaleLayout({
   children,
@@ -16,7 +17,10 @@ export default async function LocaleLayout({
 
   return (
     <ThemeProvider>
-      <NextIntlClientProvider messages={messages}>{children}</NextIntlClientProvider>
+      <NextIntlClientProvider messages={messages}>
+        <AuthSync />
+        {children}
+      </NextIntlClientProvider>
     </ThemeProvider>
   );
 }

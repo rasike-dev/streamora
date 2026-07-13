@@ -10,9 +10,9 @@ import { randomBytes } from 'crypto';
 export class ShortLinksService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getUserByKeycloakSub(keycloakSub: string) {
+  async getUserByExternalId(externalId: string) {
     return this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
       include: {
         roles: true,
       },

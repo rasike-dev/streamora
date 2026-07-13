@@ -182,6 +182,12 @@ export default function AdminPage() {
                 {tAdmin("moderationDescription")}
               </div>
             </Link>
+            <Link href={`/${locale}/admin/media-moderation`} className={tile}>
+              <div className="text-sm font-medium">Media moderation</div>
+              <div className="text-xs text-muted-foreground">
+                Review images and documents
+              </div>
+            </Link>
             <Link href={`/${locale}/admin/jobs`} className={tile}>
               <div className="text-sm font-medium">{tAdmin("jobs")}</div>
               <div className="text-xs text-muted-foreground">

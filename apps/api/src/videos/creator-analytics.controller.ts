@@ -22,9 +22,9 @@ export class CreatorAnalyticsController {
     @Req() req: any,
     @Query() query: CreatorAnalyticsOverviewQueryDto,
   ) {
-    const keycloakSub = req.user.sub;
+    const externalId = req.user.sub;
     const user =
-      await this.creatorAnalyticsService.getUserByKeycloakSub(keycloakSub);
+      await this.creatorAnalyticsService.getUserByExternalId(externalId);
     if (!user) {
       throw new NotFoundException('User not found');
     }

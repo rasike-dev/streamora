@@ -28,9 +28,9 @@ export class CreatorVideoThumbnailsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private async getOwnedVideo(videoId: string, keycloakSub: string) {
+  private async getOwnedVideo(videoId: string, externalId: string) {
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
     });
 
     if (!user) {
@@ -64,8 +64,8 @@ export class CreatorVideoThumbnailsService {
     return `https://storage.googleapis.com/${bucket}/${objectKey}`;
   }
 
-  async list(videoId: string, keycloakSub: string) {
-    await this.getOwnedVideo(videoId, keycloakSub);
+  async list(videoId: string, externalId: string) {
+    await this.getOwnedVideo(videoId, externalId);
 
     const thumbnails = await this.prisma.videoThumbnail.findMany({
       where: { videoId },
@@ -85,8 +85,8 @@ export class CreatorVideoThumbnailsService {
     };
   }
 
-  async select(videoId: string, thumbnailId: string, keycloakSub: string) {
-    await this.getOwnedVideo(videoId, keycloakSub);
+  async select(videoId: string, thumbnailId: string, externalId: string) {
+    await this.getOwnedVideo(videoId, externalId);
 
     const thumb = await this.prisma.videoThumbnail.findFirst({
       where: {
@@ -115,7 +115,7 @@ export class CreatorVideoThumbnailsService {
 
   async uploadCustom(
     videoId: string,
-    keycloakSub: string,
+    externalId: string,
     file: {
       buffer: Buffer;
       mimetype: string;
@@ -123,7 +123,7 @@ export class CreatorVideoThumbnailsService {
       originalname?: string;
     },
   ) {
-    await this.getOwnedVideo(videoId, keycloakSub);
+    await this.getOwnedVideo(videoId, externalId);
 
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedMimeTypes.includes(file.mimetype)) {

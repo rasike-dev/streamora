@@ -20,11 +20,11 @@ export class CreatorVideoVisibilityService {
 
   async updateVisibility(
     videoId: string,
-    keycloakSub: string,
+    externalId: string,
     visibility: 'PUBLIC' | 'UNLISTED' | 'PRIVATE',
   ) {
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
     });
 
     if (!user) {

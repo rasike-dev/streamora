@@ -8,10 +8,12 @@ import {
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
+import { getRolesFromRequest } from '../auth/auth-user.util';
 import { JwtGuard } from '../auth/jwt.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { GcsService } from '../storage/gcs.service';
 import { PubsubService } from '../events/pubsub.service';
+import { validateUploadedMediaContent } from '../media/media-policy.util';
 
 @Controller()
 export class UploadCompleteV2Controller {
@@ -24,28 +26,32 @@ export class UploadCompleteV2Controller {
   @Post('uploads/:id/complete')
   @UseGuards(JwtGuard)
   async complete(@Req() req: any, @Param('id') uploadIntentId: string) {
-    console.log(`[${req.requestId}] uploads.complete start`, {
-      uploadIntentId,
-      userSub: req.user?.sub,
-    });
-
     const sub = req.user?.sub;
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub: sub },
+      where: { externalId: sub },
     });
     if (!user) throw new NotFoundException('User not found');
 
     const intent = await this.prisma.uploadIntent.findUnique({
       where: { id: uploadIntentId },
-      include: { video: true },
+      include: { video: true, mediaItem: true },
     });
     if (!intent) throw new NotFoundException('Upload intent not found');
 
-    const roles: string[] = req.user?.realm_access?.roles ?? [];
+    const roles = getRolesFromRequest(req);
     const isAdmin = roles.includes('ADMIN');
-    if (
+
+    if (intent.targetKind === 'MEDIA') {
+      if (
+        !isAdmin &&
+        intent.mediaItem?.uploaderId &&
+        intent.mediaItem.uploaderId !== user.id
+      ) {
+        throw new ForbiddenException('Not allowed');
+      }
+    } else if (
       !isAdmin &&
-      intent.video.uploaderId &&
+      intent.video?.uploaderId &&
       intent.video.uploaderId !== user.id
     ) {
       throw new ForbiddenException('Not allowed');
@@ -55,27 +61,44 @@ export class UploadCompleteV2Controller {
       return { ok: true, alreadyCompleted: true };
     }
 
-    // Verify object exists in GCS
     const bucket = this.gcs.bucket(intent.bucket);
     const file = bucket.file(intent.objectKey);
-
     const [exists] = await file.exists();
     if (!exists) throw new BadRequestException('GCS object not found');
 
     const [meta] = await file.getMetadata();
     const actualSize = Number(meta.size ?? 0);
     const expectedSize = Number(intent.sizeBytes);
-
-    // size check (strict)
     if (expectedSize > 0 && actualSize !== expectedSize) {
       throw new BadRequestException(
         `Size mismatch. expected=${expectedSize} actual=${actualSize}`,
       );
     }
 
-    const contentType = meta.contentType || intent.contentType;
+    let contentType = meta.contentType || intent.contentType;
 
-    // Update DB atomically
+    if (intent.targetKind === 'MEDIA' && intent.mediaItem) {
+      const [buffer] = await file.download({ start: 0, end: Math.min(actualSize, 8192) - 1 });
+      contentType = await validateUploadedMediaContent(
+        intent.mediaItem.kind,
+        contentType,
+        buffer,
+      );
+    }
+
+    if (intent.targetKind === 'MEDIA' && intent.mediaItemId) {
+      return this.completeMediaUpload(req, intent, contentType, actualSize);
+    }
+
+    return this.completeVideoUpload(req, intent, contentType, actualSize);
+  }
+
+  private async completeVideoUpload(
+    req: any,
+    intent: any,
+    contentType: string,
+    actualSize: number,
+  ) {
     await this.prisma.$transaction(async (tx) => {
       await tx.uploadIntent.update({
         where: { id: intent.id },
@@ -110,10 +133,10 @@ export class UploadCompleteV2Controller {
       });
     });
 
-    // Publish event to Pub/Sub (worker consumes Day 7)
     const topic = process.env.PUBSUB_TOPIC_VIDEO_UPLOADED!;
-    if (!topic)
+    if (!topic) {
       throw new BadRequestException('Missing PUBSUB_TOPIC_VIDEO_UPLOADED');
+    }
 
     await this.pubsub.publish(topic, {
       type: 'video.uploaded',
@@ -127,15 +150,90 @@ export class UploadCompleteV2Controller {
       correlationId: req.requestId,
     });
 
-    console.log(`[${req.requestId}] uploads.complete success`, {
-      uploadIntentId: intent.id,
+    return {
+      ok: true,
+      targetKind: 'VIDEO',
       videoId: intent.videoId,
+      uploadIntentId: intent.id,
       objectKey: intent.objectKey,
+    };
+  }
+
+  private async completeMediaUpload(
+    req: any,
+    intent: any,
+    contentType: string,
+    actualSize: number,
+  ) {
+    const jobType =
+      intent.mediaItem?.kind === 'IMAGE' ? 'IMAGE_DERIVATIVES' : 'DOC_THUMBNAIL';
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.uploadIntent.update({
+        where: { id: intent.id },
+        data: {
+          status: 'COMPLETED',
+          uploadedBytes: intent.sizeBytes,
+          completedAt: new Date(),
+          lastError: null,
+        },
+      });
+
+      await tx.mediaItem.update({
+        where: { id: intent.mediaItemId },
+        data: { status: 'UPLOADED' },
+      });
+
+      await tx.mediaAsset.upsert({
+        where: { mediaItemId: intent.mediaItemId },
+        update: {
+          bucket: intent.bucket,
+          originalKey: intent.objectKey,
+          contentType,
+          sizeBytes: BigInt(actualSize),
+          originalFilename: intent.originalFilename,
+        },
+        create: {
+          mediaItemId: intent.mediaItemId,
+          bucket: intent.bucket,
+          originalKey: intent.objectKey,
+          contentType,
+          sizeBytes: BigInt(actualSize),
+          originalFilename: intent.originalFilename,
+        },
+      });
+
+      await tx.processingJob.create({
+        data: {
+          mediaItemId: intent.mediaItemId,
+          uploadIntentId: intent.id,
+          jobType,
+          status: 'PENDING',
+        },
+      });
+    });
+
+    const topic =
+      process.env.PUBSUB_TOPIC_MEDIA_UPLOADED || 'media.uploaded';
+
+    await this.pubsub.publish(topic, {
+      type: 'media.uploaded',
+      mediaItemId: intent.mediaItemId,
+      kind: intent.mediaItem?.kind,
+      uploadIntentId: intent.id,
+      bucket: intent.bucket,
+      objectKey: intent.objectKey,
+      contentType,
+      sizeBytes: actualSize,
+      jobType,
+      occurredAt: new Date().toISOString(),
+      correlationId: req.requestId,
     });
 
     return {
       ok: true,
-      videoId: intent.videoId,
+      targetKind: 'MEDIA',
+      mediaItemId: intent.mediaItemId,
       uploadIntentId: intent.id,
       objectKey: intent.objectKey,
     };

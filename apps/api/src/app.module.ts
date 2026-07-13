@@ -50,12 +50,24 @@ import { AdminUsersController } from './admin/admin.users.controller';
 import { AdminChannelsController } from './admin/admin.channels.controller';
 import { AdminTagsController } from './admin/admin.tags.controller';
 import { AdminJobsController } from './admin/admin.jobs.controller';
+import { AdminSchedulerController } from './admin/admin.scheduler.controller';
 import { AdminGovernanceService } from './admin/admin-governance.service';
 import { SearchModule } from './search/search.module';
 import { HealthController } from './health/health.controller';
 import { GcsService } from './storage/gcs.service';
 import { PubsubService } from './events/pubsub.service';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { MediaController } from './media/media.controller';
+import { MediaService } from './media/media.service';
+import { MediaVisibilityService } from './media/media-visibility.service';
+import { MediaScheduleService } from './media/media-schedule.service';
+import { AdminMediaModerationController } from './admin/admin.media-moderation.controller';
+import { AdminMediaGovernanceController } from './admin/admin-media-governance.controller';
+import { AdminMediaGovernanceService } from './admin/admin-media-governance.service';
+import { PublicMediaController } from './public/public-media.controller';
+import { PublicMediaService } from './public/public-media.service';
+import { MediaShortLinksController } from './short-links/media-short-links.controller';
+import { MediaShortLinksService } from './short-links/media-short-links.service';
 import { rateLimitConfig } from './common/rate-limit.config';
 
 @Module({
@@ -96,14 +108,20 @@ import { rateLimitConfig } from './common/rate-limit.config';
     PublicVideoAnalyticsController,
     CreatorVideoAnalyticsController,
     CreatorAnalyticsController,
+    MediaController,
+    PublicMediaController,
+    MediaShortLinksController,
     ShortLinksController,
     VideoSubtitlesController,
     AdminModerationController,
+    AdminMediaModerationController,
     AdminGovernanceController,
+    AdminMediaGovernanceController,
     AdminUsersController,
     AdminChannelsController,
     AdminTagsController,
     AdminJobsController,
+    AdminSchedulerController,
     HealthController,
   ],
   providers: [
@@ -120,6 +138,12 @@ import { rateLimitConfig } from './common/rate-limit.config';
     PublicVideoAnalyticsService,
     CreatorVideoAnalyticsService,
     CreatorAnalyticsService,
+    MediaService,
+    MediaVisibilityService,
+    MediaScheduleService,
+    PublicMediaService,
+    MediaShortLinksService,
+    AdminMediaGovernanceService,
     ShortLinksService,
     AdminGovernanceService,
     VideoSubtitlesService,

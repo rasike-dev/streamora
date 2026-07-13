@@ -5,6 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { getRolesFromRequest } from './auth-user.util';
 import { ROLES_KEY } from './roles.decorator';
 
 @Injectable()
@@ -20,7 +21,7 @@ export class RolesGuard implements CanActivate {
     if (!required || required.length === 0) return true;
 
     const req = context.switchToHttp().getRequest();
-    const roles: string[] = req.user?.realm_access?.roles ?? [];
+    const roles = getRolesFromRequest(req);
 
     const ok = required.some((r) => roles.includes(r));
     if (!ok) throw new ForbiddenException('Insufficient role');

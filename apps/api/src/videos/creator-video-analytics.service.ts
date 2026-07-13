@@ -5,9 +5,9 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CreatorVideoAnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getUserByKeycloakSub(keycloakSub: string) {
+  async getUserByExternalId(externalId: string) {
     return this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
     });
   }
 

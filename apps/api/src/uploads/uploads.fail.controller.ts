@@ -8,6 +8,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { getRolesFromRequest } from '../auth/auth-user.util';
 import { JwtGuard } from '../auth/jwt.guard';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -30,7 +31,7 @@ export class UploadFailController {
 
     const sub = req.user?.sub;
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub: sub },
+      where: { externalId: sub },
     });
     if (!user) throw new NotFoundException('User not found');
 
@@ -40,7 +41,7 @@ export class UploadFailController {
     });
     if (!intent) throw new NotFoundException('Upload intent not found');
 
-    const roles: string[] = req.user?.realm_access?.roles ?? [];
+    const roles = getRolesFromRequest(req);
     const isAdmin = roles.includes('ADMIN');
 
     if (

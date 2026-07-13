@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getValidAccessToken } from "@/lib/auth/tokens";
-import { canAccessAdminFromToken } from "@/lib/auth/roles";
+import { useUser } from "@clerk/nextjs";
+import { getRolesFromMetadata, hasAdminAccess } from "@/lib/auth/roles";
 
 export function AdminNavLink({
   locale,
@@ -14,30 +13,12 @@ export function AdminNavLink({
   label: string;
   className: string;
 }) {
-  const [show, setShow] = useState(false);
+  const { user, isLoaded } = useUser();
 
-  useEffect(() => {
-    let active = true;
+  if (!isLoaded || !user) return null;
 
-    const sync = async () => {
-      const token = await getValidAccessToken();
-      if (active) setShow(canAccessAdminFromToken(token));
-    };
-
-    sync();
-
-    const onExpired = () => {
-      if (active) setShow(false);
-    };
-    window.addEventListener("auth:expired", onExpired);
-
-    return () => {
-      active = false;
-      window.removeEventListener("auth:expired", onExpired);
-    };
-  }, []);
-
-  if (!show) return null;
+  const roles = getRolesFromMetadata(user.publicMetadata);
+  if (!hasAdminAccess(roles)) return null;
 
   return (
     <Link href={`/${locale}/admin`} className={className}>

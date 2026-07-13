@@ -4,8 +4,12 @@
   "common": {
     "home": "මුල් පිටුව",
     "browseVideos": "වීඩියෝ බලන්න",
+    "browseMedia": "මාධ්‍ය බලන්න",
     "dashboard": "ඩැෂ්බෝඩ්",
     "upload": "උඩුගත කරන්න",
+    "uploadVideo": "වීඩියෝ උඩුගත කරන්න",
+    "uploadMedia": "මාධ්‍ය උඩුගත කරන්න",
+    "myMedia": "මගේ මාධ්‍ය",
     "login": "ඇතුල් වීම",
     "admin": "පරිපාලක",
     "back": "ආපසු",
@@ -53,7 +57,20 @@
     "title": "උඩුගත කිරීම",
     "description": "ඔබේ නිර්මාතෘ ගිණුමෙන් නව වීඩියෝ ප්‍රකාශ කරන්න.",
     "intro": "ගොනුවක් තෝරා මෙටා දත්ත පුරවන්න. ප්‍රකාශයට පෙර කෙටුම්පත් සංස්කරණය කළ හැක.",
-    "envMissing": "ඇතුල් වීම වින්‍යාසගත නොවී ඇත. NEXT_PUBLIC_KEYCLOAK_ISSUER, NEXT_PUBLIC_KEYCLOAK_CLIENT_ID, NEXT_PUBLIC_APP_URL සකසන්න."
+    "alsoUploadMedia": "රූපයක් හෝ ලේඛනයක් බෙදා ගැනීමට අවශ්‍යද?",
+    "uploadMediaLink": "රූප සහ ලේඛන උඩුගත කිරීමට යන්න",
+    "envMissing": "ඇතුල් වීම වින්‍යාසගත නොවී ඇත. NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY සහ CLERK_SECRET_KEY සකසන්න."
+  },
+  "mediaBrowsePage": {
+    "title": "මාධ්‍ය ගවේෂණය",
+    "description": "සත්‍යාපිත නිර්මාතෘවරුන්ගේ ප්‍රසිද්ධ රූප සහ ලේඛන බලන්න.",
+    "empty": "ප්‍රකාශිත මාධ්‍ය තවම නැත.",
+    "emptyHint": "නව අන්තර්ගතය සඳහා පසුව නැවත බලන්න.",
+    "loadError": "මාධ්‍ය කැටලුව පූරණය කළ නොහැකි විය.",
+    "views": "නැරඹීම්",
+    "previous": "පෙර",
+    "next": "ඊළඟ",
+    "pageOf": "පිටුව {page} / {total}"
   },
   "authCallback": {
     "successTitle": "ඇතුල් විය",
@@ -192,25 +209,77 @@
     "retryHint": "නැවත ඇතුල් වීමට හෝ ජාලය පරීක්ෂා කරන්න."
   },
   "landing": {
-    "metaTitle": "Streamora — නිර්මාතෘ සත්‍යාපිත වීඩියෝ",
-    "metaDescription": "සත්‍යාපිත නිර්මාතෘවරුන්ගේ වීඩියෝ ගවේෂණය කරන්න. විශ්වාසය පදනම් කරගත් වේදිකාවක උඩුගත කර බලන්න.",
+    "metaTitle": "Streamora — නිල වීඩියෝ වේදිකාව",
+    "metaDescription": "පාඨකයන් සඳහා නිල වීඩියෝ වේදිකාව. උඩුගත කරන්න, සමාලෝචනය, ප්‍රකාශ කර බෙදාගන්න.",
     "navBrowse": "වීඩියෝ බලන්න",
-    "heroTitle": "ඔබට විශ්වාස කළ හැකි වීඩියෝ, හඳුනන නිර්මාතෘවරුන්ගෙන්",
-    "heroSubtitle": "පොදු කැටලුගත බලන්න, ඔබේ කතාව උඩුගත කරන්න, සහ උපාංග සියල්ලේම මැද පෙන්වීම සමඟ ප්‍රේක්ෂකයන්ට ළඟා වන්න.",
+    "heroTitle": "අපගේ පාඨකයන් සඳහා නිල වීඩියෝ වේදිකාව",
+    "heroSubtitle": "ඔබේ කතාව උඩුගත කරන්න, සංස්කාරක කණ්ඩායම සමඟ වැඩ කරන්න, සහ ගුණාත්මක පෙන්වීම සමඟ ප්‍රේක්ෂකයන්ට ළඟා වන්න.",
     "ctaBrowse": "වීඩියෝ ගවේෂණය",
-    "ctaCreatorLogin": "නිර්මාතෘ ඇතුල් වීම",
+    "ctaCreatorLogin": "පාඨක ඇතුල් වීම",
+    "howItWorksTitle": "ක්‍රියාකාරී ආකාරය",
+    "stepLabel": "පියවර {number}",
+    "step1Title": "ආරාධනාව ලබාගන්න",
+    "step1Body": "වේදිකා කණ්ඩායමෙන් ප්‍රවේශය ඉල්ලන්න. ආරාධනා කළ පසු ඇතුල් වී උඩුගත කිරීම ආරම්භ කරන්න.",
+    "step2Title": "උඩුගත කර සංස්කරණය",
+    "step2Body": "වීඩියෝ උඩුගත කර ඔබේ භාෂාවෙන් මාතෘකා සහ විස්තර එක් කරන්න.",
+    "step3Title": "සමාලෝචනයට ඉදිරිපත් කරන්න",
+    "step3Body": "සූදානම් වූ විට ඉදිරිපත් කරන්න. ප්‍රකාශයට පෙර අපගේ කණ්ඩායම සමාලෝචනය කරයි.",
+    "step4Title": "ප්‍රකාශ කර බෙදාගන්න",
+    "step4Body": "අනුමත කිරීමෙන් පසු වීඩියෝව සජීවී වේ. සබැඳි බෙදාගන්න.",
     "featuresTitle": "Streamora තෝරන්නේ ඇයින් ද",
-    "feature1Title": "නිර්මාතෘ සත්‍යාපිත කැටලුව",
-    "feature1Body": "පොදු ලැයිස්තු පරීක්ෂණය කළ අන්තර්ගතය ඉස්මතු කරයි — නියම ගුණාත්මක බව සහ නිර්මාතෘවරුන් සඳහා.",
+    "feature1Title": "සංස්කාරක විශ්වාසය",
+    "feature1Body": "සෑම පොදු වීඩියෝවක්ම සමාලෝචනය කෙරේ. ප්‍රේක්ෂකයන්ට සත්‍යාපිත අන්තර්ගතයක් ලැබේ.",
     "feature2Title": "නිර්මාතෘවරුන්ට ගැලපෙන ලෙස",
-    "feature2Body": "කෙටුම්පත් උඩුගත කිරීම්, දෘශ්‍යතාව කළමනාකරණය, සහ නාලිකා වර්ධනයට හොඳම මෙවලම්.",
+    "feature2Body": "නැවත ආරම්භ කළ හැකි උඩුගත කිරීම්, බහුභාෂා මෙටා දත්ත, සහ විශ්ලේෂණ.",
     "feature3Title": "මෘදු පෙන්වීම",
     "feature3Body": "ගත් ක‍ය වීඩියෝ සහ දුරකථන හරහා විශ්වාසදායක බැලීමක් ලබා දේ.",
+    "contactTitle": "පාඨක ප්‍රවේශය ඉල්ලන්න",
+    "contactBody": "Streamora ආරාධනා පදනම් වේ. අන්තර්ගත පාඨකයෙකු ලෙස ආරම්භ කිරීමට කණ්ඩායම අමතන්න.",
+    "contactCta": "ඊමේල් කරන්න",
+    "contactSubject": "Streamora පාඨක ප්‍රවේශ ඉල්ලීම",
     "footerBrowse": "වීඩියෝ ගවේෂණය",
-    "footerUpload": "උඩුගත කරන්න",
-    "footerDashboard": "ඩැෂ්බෝඩ්",
-    "footerAdmin": "පරිපාලක",
+    "footerLogin": "ඇතුල් වීම",
+    "footerTerms": "කොන්දේසි",
+    "footerPrivacy": "පෞද්ගලිකත්වය",
     "footerCopyright": "© {year} Streamora. සියලු හිමිකම් ඇවුරුණු ය."
+  },
+  "legal": {
+    "termsNav": "Terms of Service",
+    "privacyNav": "Privacy Policy",
+    "cookiesNav": "Cookies",
+    "lastUpdated": "Last updated: July 2026",
+    "termsTitle": "Terms of Service",
+    "privacyTitle": "Privacy Policy",
+    "cookiesTitle": "Cookie Policy",
+    "cookiesIntro": "Streamora uses cookies to keep you signed in and to understand platform usage.",
+    "cookies": {
+      "sessionTitle": "Session cookies",
+      "sessionBody": "Clerk authentication sets session cookies for secure sign-in.",
+      "analyticsTitle": "Analytics",
+      "analyticsBody": "Anonymous playback events are recorded for published videos."
+    },
+    "terms": {
+      "s1Title": "Acceptance",
+      "s1Body": "By using Streamora you agree to these terms. Access is by invitation only.",
+      "s2Title": "Content ownership",
+      "s2Body": "You retain ownership of uploaded videos and grant the platform a license to host and distribute them.",
+      "s3Title": "Moderation",
+      "s3Body": "All content is reviewed before publication.",
+      "s4Title": "Acceptable use",
+      "s4Body": "Do not upload unlawful or harmful material.",
+      "s5Title": "Limitation of liability",
+      "s5Body": "The platform is provided as-is to the extent permitted by law."
+    },
+    "privacy": {
+      "s1Title": "Who we are",
+      "s1Body": "Streamora is a video platform for invited stakeholders.",
+      "s2Title": "Information we collect",
+      "s2Body": "Account data from Clerk, uploaded videos, and anonymous analytics.",
+      "s3Title": "How we use data",
+      "s3Body": "Data is used to operate the platform and provide analytics. We do not sell personal information.",
+      "s4Title": "Your rights",
+      "s4Body": "Contact the platform operator to request access, correction, or deletion."
+    }
   },
   "login": {
     "title": "ඇතුල් වන්න",
@@ -222,6 +291,8 @@
     "title": "නිර්මාතෘ ඩැෂ්බෝඩ්",
     "createDraft": "කෙටුම්පතක් සාදන්න",
     "myVideos": "මගේ වීඩියෝ",
+    "myMedia": "මගේ මාධ්‍ය",
+    "uploadMedia": "මාධ්‍ය උඩුගත කරන්න",
     "form": {
       "title": "ශීර්ෂය",
       "description": "විස්තරය",
@@ -230,5 +301,28 @@
       "tags": "ටැග් (කොමාවෙන් වෙන් කරන ලද)",
       "save": "කෙටුම්පත සුරකින්න"
     }
+  },
+  "mediaUploadPage": {
+    "title": "රූපයක් හෝ ලේඛනයක් උඩුගත කරන්න",
+    "description": "සමාලෝචනය සහ බෙදාගැනීම සඳහා මාධ්‍ය එක් කරන්න.",
+    "intro": "රූපය හෝ ලේඛනය තෝරා, විස්තර එක් කර, උඩුගත කරන්න.",
+    "alsoUploadVideo": "වීඩියෝවක් උඩුගත කරනවාද?",
+    "uploadVideoLink": "වීඩියෝ උඩුගත කිරීමට යන්න"
+  },
+  "mediaPage": {
+    "title": "මාධ්‍ය",
+    "description": "ඔබ උඩුගත කළ රූප සහ ලේඛන.",
+    "empty": "මාධ්‍ය තවම නැත. ආරම්භ කිරීමට රූපයක් හෝ ලේඛනයක් උඩුගත කරන්න.",
+    "myMedia": "මගේ මාධ්‍ය",
+    "uploadMedia": "මාධ්‍ය උඩුගත කරන්න",
+    "editMedia": "මාධ්‍ය සංස්කරණය",
+    "edit": "සංස්කරණය",
+    "views": "නැරඹීම්",
+    "downloads": "බාගත කිරීම්",
+    "submitForReview": "සමාලෝචනයට යවන්න",
+    "resubmit": "නැවත යවන්න",
+    "getShareLink": "බෙදාගැනීමේ සබැඳිය",
+    "preview": "පෙරදසුන",
+    "download": "බාගත කරන්න"
   }
 }

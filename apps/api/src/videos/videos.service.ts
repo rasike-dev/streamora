@@ -15,7 +15,7 @@ export class VideosService {
   ) {}
 
   async createDraft(
-    keycloakSub: string,
+    externalId: string,
     data: {
       locale: string;
       title?: string;
@@ -28,14 +28,14 @@ export class VideosService {
   ) {
     if (requestId) {
       console.log(`[${requestId}] creator.videos.draft.create start`, {
-        keycloakSub,
+        externalId,
         locale: data.locale,
       });
     }
 
-    // Find user by keycloakSub
+    // Find user by externalId
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
     });
 
     if (!user) {
@@ -88,7 +88,7 @@ export class VideosService {
 
   async updateDraft(
     videoId: string,
-    keycloakSub: string,
+    externalId: string,
     data: {
       locale?: string;
       title?: string;
@@ -100,7 +100,7 @@ export class VideosService {
   ) {
     // Find user
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
     });
 
     if (!user) {
@@ -185,9 +185,9 @@ export class VideosService {
     });
   }
 
-  async findByUploader(keycloakSub: string) {
+  async findByUploader(externalId: string) {
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
     });
 
     if (!user) {
@@ -205,9 +205,9 @@ export class VideosService {
     });
   }
 
-  async getDraft(videoId: string, keycloakSub: string) {
+  async getDraft(videoId: string, externalId: string) {
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
     });
 
     if (!user) {
@@ -256,7 +256,7 @@ export class VideosService {
 
   async updateDraftFull(
     videoId: string,
-    keycloakSub: string,
+    externalId: string,
     data: {
       translations?: Array<{
         locale: 'en' | 'si' | 'ta';
@@ -270,7 +270,7 @@ export class VideosService {
     },
   ) {
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
     });
 
     if (!user) {
@@ -378,9 +378,9 @@ export class VideosService {
     });
   }
 
-  async submitForModeration(videoId: string, keycloakSub: string) {
+  async submitForModeration(videoId: string, externalId: string) {
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
     });
 
     if (!user) {
@@ -412,9 +412,9 @@ export class VideosService {
     return { success: true, videoId, status: 'PENDING_APPROVAL' };
   }
 
-  async resubmitVideo(videoId: string, keycloakSub: string) {
+  async resubmitVideo(videoId: string, externalId: string) {
     const user = await this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
     });
 
     if (!user) {
@@ -469,9 +469,9 @@ export class VideosService {
     };
   }
 
-  async getUserByKeycloakSub(keycloakSub: string) {
+  async getUserByExternalId(externalId: string) {
     return this.prisma.user.findUnique({
-      where: { keycloakSub },
+      where: { externalId },
     });
   }
 

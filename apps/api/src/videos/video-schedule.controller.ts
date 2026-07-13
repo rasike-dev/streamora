@@ -14,10 +14,10 @@ export class CreatorVideoScheduleController {
     @Body() dto: UpdateVideoScheduleDto,
     @Req() req: any,
   ) {
-    const keycloakSub = req.user.sub;
+    const externalId = req.user.sub;
     return this.scheduleService.updateSchedule(
       videoId,
-      keycloakSub,
+      externalId,
       dto.scheduledAt,
     );
   }

@@ -1,0 +1,89 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - prod
+
+env:
+  PROJECT_ID: streamora-487815
+  REGION: us-central1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate
+        run: pnpm --filter api exec prisma generate
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push images
+        env:
+          REGISTRY: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/streamora
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -f apps/api/Dockerfile -t "$REGISTRY/api:$TAG" -t "$REGISTRY/api:latest" .
+          docker build -f apps/web/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }} \
+            --build-arg NEXT_PUBLIC_APP_URL=${{ vars.NEXT_PUBLIC_APP_URL }} \
+            --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }} \
+            -t "$REGISTRY/web:$TAG" -t "$REGISTRY/web:latest" .
+          docker build -f apps/worker/Dockerfile -t "$REGISTRY/worker:$TAG" -t "$REGISTRY/worker:latest" .
+          docker push "$REGISTRY/api:$TAG" && docker push "$REGISTRY/api:latest"
+          docker push "$REGISTRY/web:$TAG" && docker push "$REGISTRY/web:latest"
+          docker push "$REGISTRY/worker:$TAG" && docker push "$REGISTRY/worker:latest"
+
+      - name: Deploy to Cloud Run
+        env:
+          ENV: ${{ github.event.inputs.environment }}
+          TAG: ${{ github.sha }}
+        run: |
+          chmod +x infra/scripts/deploy-staging.sh
+          IMAGE_TAG="$TAG" ENV="$ENV" ./infra/scripts/deploy-staging.sh
+
+      - name: Run database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: pnpm --filter api exec prisma migrate deploy
+
+      - name: Smoke test API health
+        run: |
+          API_URL="${{ vars.NEXT_PUBLIC_API_URL }}"
+          curl -fsS "${API_URL}/health" | grep -q '"status":"ok"'

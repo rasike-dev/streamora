@@ -33,6 +33,15 @@ secrets/
 .env.*
 !.env.example
 
+# Cloud provider credentials (never commit)
+*credentials.json
+*service-account*.json
+
+# Cursor / agent tooling (local only)
+.cursor/
+.agents/
+skills-lock.json
+
 # IDE
 .vscode/
 .idea/

@@ -12,6 +12,8 @@ import os from "os";
 /** Load apps/worker/.env before GCP clients are constructed (cwd-independent). */
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
+import { processMediaMessage, MediaUploadedEvent } from "./media-worker";
+
 const execFileAsync = promisify(execFile);
 
 const prisma = new PrismaClient();
@@ -505,6 +507,57 @@ More detail: docs/day7-setup.md
       printPubSubSubscriberDeniedHelp(projectId, subName);
     }
   });
+
+  const mediaSubName =
+    process.env.PUBSUB_SUBSCRIPTION_MEDIA_UPLOADED || "media.uploaded-worker";
+  const mediaTopic =
+    process.env.PUBSUB_TOPIC_MEDIA_UPLOADED || "media.uploaded";
+
+  try {
+    const mediaSubscription = pubsub.subscription(mediaSubName);
+    const mediaSubExists = await verifySubscriptionExistsBestEffort(mediaSubscription);
+
+    if (!mediaSubExists) {
+      console.warn(
+        `Media subscription "${mediaSubName}" not found. Create topic ${mediaTopic} and subscription ${mediaSubName} to process image/document uploads.`,
+      );
+    } else {
+      console.log(`Streamora Worker listening on media subscription: ${mediaSubName}`);
+      mediaSubscription.on("message", async (message) => {
+        try {
+          const data = JSON.parse(message.data.toString("utf-8")) as MediaUploadedEvent;
+          if (data.type !== "media.uploaded") {
+            message.ack();
+            return;
+          }
+
+          console.log(
+            `Processing media.uploaded: mediaItemId=${data.mediaItemId} kind=${data.kind}`,
+          );
+          await processMediaMessage(data, { prisma, storage });
+          message.ack();
+        } catch (err: any) {
+          console.error("Media worker error:", err?.message || err);
+          try {
+            const raw = JSON.parse(message.data.toString("utf-8")) as Partial<MediaUploadedEvent>;
+            if (raw.mediaItemId) {
+              await prisma.mediaItem.update({
+                where: { id: raw.mediaItemId },
+                data: { status: "PROCESSING_FAILED" },
+              });
+            }
+          } catch {}
+          message.nack();
+        }
+      });
+
+      mediaSubscription.on("error", (e: any) => {
+        console.error("Media subscription error:", e);
+      });
+    }
+  } catch (err) {
+    console.warn("Media subscription setup skipped:", err);
+  }
 }
 
 main().catch((e) => {
