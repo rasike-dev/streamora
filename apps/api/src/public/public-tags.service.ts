@@ -1,9 +1,39 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { normalizeTagName } from '../common/taxonomy/normalize.util';
 
 @Injectable()
 export class PublicTagsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Resolves a URL slug to the tag that should be shown.
+   *
+   * A merged tag keeps its row and slug, so old links stay resolvable and are
+   * answered with the merge target plus a canonical slug the page can redirect
+   * to. Aliases added by admins are matched on their normalized form.
+   */
+  private async resolveTag(slug: string) {
+    const direct = await this.prisma.tag.findFirst({ where: { slug } });
+
+    if (direct) {
+      if (direct.status === 'MERGED' && direct.mergedIntoTagId) {
+        const target = await this.prisma.tag.findUnique({
+          where: { id: direct.mergedIntoTagId },
+        });
+        if (target) return target;
+      }
+
+      return direct;
+    }
+
+    const alias = await this.prisma.tagAlias.findUnique({
+      where: { normalizedAlias: normalizeTagName(slug.replace(/-/g, ' ')) },
+      include: { tag: true },
+    });
+
+    return alias?.tag ?? null;
+  }
 
   private toPublicUrl(bucket: string, objectKey: string) {
     const cdnBase =
@@ -20,10 +50,14 @@ export class PublicTagsService {
     const pageSize = Math.min(48, Math.max(1, opts.pageSize || 12));
     const skip = (page - 1) * pageSize;
 
-    const tag = await this.prisma.tag.findFirst({
-      where: {
-        slug,
-      },
+    const resolved = await this.resolveTag(slug);
+
+    if (!resolved) {
+      throw new NotFoundException('Tag not found');
+    }
+
+    const tag = await this.prisma.tag.findUniqueOrThrow({
+      where: { id: resolved.id },
       include: {
         translations: {
           where: {
@@ -34,10 +68,6 @@ export class PublicTagsService {
         },
       },
     });
-
-    if (!tag) {
-      throw new NotFoundException('Tag not found');
-    }
 
     const translated =
       tag.translations.find((t) => t.locale === opts.locale) ??
@@ -99,6 +129,8 @@ export class PublicTagsService {
         slug: tag.slug,
         name: translated?.name ?? tag.name,
         description: translated?.description ?? null,
+        // Non-null when the requested slug was an alias or a merged tag.
+        redirectedFrom: tag.slug === slug ? null : slug,
       },
       pagination: {
         page,

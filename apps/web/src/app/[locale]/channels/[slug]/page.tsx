@@ -69,6 +69,7 @@ export default async function ChannelPage({
   const t = await getTranslations({ locale, namespace: "channelPage" });
   const tCommon = await getTranslations({ locale, namespace: "common" });
   const tVideos = await getTranslations({ locale, namespace: "videosPage" });
+  const tTaxonomy = await getTranslations({ locale, namespace: "taxonomy" });
 
   let data: Awaited<ReturnType<typeof getPublicChannelBySlug>>;
   try {
@@ -108,6 +109,37 @@ export default async function ChannelPage({
 
       <main className="flex-1">
         <PageFrame>
+          <nav className="mb-4 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+            <Link href={`/${locale}/categories`} className="hover:underline">
+              {tTaxonomy("categories")}
+            </Link>
+            {data.breadcrumb?.category && data.breadcrumb?.subcategory ? (
+              <>
+                <span>/</span>
+                <Link
+                  href={`/${locale}/categories/${data.breadcrumb.category.slug}`}
+                  className="hover:underline"
+                >
+                  {data.breadcrumb.category.name}
+                </Link>
+                <span>/</span>
+                <Link
+                  href={`/${locale}/categories/${data.breadcrumb.category.slug}/${data.breadcrumb.subcategory.slug}`}
+                  className="hover:underline"
+                >
+                  {data.breadcrumb.subcategory.name}
+                </Link>
+              </>
+            ) : (
+              <>
+                <span>/</span>
+                <span>{tTaxonomy("unclassified")}</span>
+              </>
+            )}
+            <span>/</span>
+            <span className="text-foreground">{data.channel.name}</span>
+          </nav>
+
           <PageHeading
             title={data.channel.name}
             description={data.channel.description || undefined}

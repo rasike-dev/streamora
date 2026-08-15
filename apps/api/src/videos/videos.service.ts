@@ -6,12 +6,16 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatorVideosQueryService } from './creator-videos-query.service';
+import { ContentTaxonomyService } from '../taxonomy/content-taxonomy.service';
+import { TagsService } from '../tags/tags.service';
 
 @Injectable()
 export class VideosService {
   constructor(
     private prisma: PrismaService,
     private queryService: CreatorVideosQueryService,
+    private contentTaxonomy: ContentTaxonomyService,
+    private tags: TagsService,
   ) {}
 
   async createDraft(
@@ -45,6 +49,14 @@ export class VideosService {
     // Generate slug (simple timestamp-based for now)
     const slug = `vid-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
+    // The legacy id-based payload goes through the same validation as the slug
+    // path, so a draft can never start life pointing at an archived channel.
+    const channelIds = data.channelIds
+      ? await this.contentTaxonomy.resolveChannelIdsById(data.channelIds)
+      : [];
+    const primaryChannelId =
+      this.contentTaxonomy.resolvePrimaryChannelIdById(channelIds);
+
     // Create video
     const video = await this.prisma.video.create({
       data: {
@@ -53,6 +65,7 @@ export class VideosService {
         visibility: 'PRIVATE',
         uploaderId: user.id,
         uploaderVisible: false,
+        primaryChannelId,
         translations: {
           create: {
             locale: data.locale || 'en',
@@ -61,9 +74,9 @@ export class VideosService {
             tagline: data.tagline,
           },
         },
-        channels: data.channelIds
+        channels: channelIds.length
           ? {
-              create: data.channelIds.map((channelId) => ({
+              create: channelIds.map((channelId) => ({
                 channelId,
               })),
             }
@@ -72,6 +85,7 @@ export class VideosService {
           ? {
               create: data.tagIds.map((tagId) => ({
                 tagId,
+                addedById: user.id,
               })),
             }
           : undefined,
@@ -146,17 +160,31 @@ export class VideosService {
 
     // Update channels if provided
     if (data.channelIds !== undefined) {
+      const channelIds = await this.contentTaxonomy.resolveChannelIdsById(
+        data.channelIds,
+      );
+
       await this.prisma.videoChannel.deleteMany({
         where: { videoId },
       });
-      if (data.channelIds.length > 0) {
+      if (channelIds.length > 0) {
         await this.prisma.videoChannel.createMany({
-          data: data.channelIds.map((channelId) => ({
+          data: channelIds.map((channelId) => ({
             videoId,
             channelId,
           })),
         });
       }
+
+      // Keep the breadcrumb pointer consistent with the new selection.
+      await this.prisma.video.update({
+        where: { id: videoId },
+        data: {
+          primaryChannelId: channelIds.includes(video.primaryChannelId)
+            ? video.primaryChannelId
+            : this.contentTaxonomy.resolvePrimaryChannelIdById(channelIds),
+        },
+      });
     }
 
     // Update tags if provided
@@ -169,6 +197,7 @@ export class VideosService {
           data: data.tagIds.map((tagId) => ({
             videoId,
             tagId,
+            addedById: user.id,
           })),
         });
       }
@@ -241,6 +270,8 @@ export class VideosService {
         archivedBy: true,
         createdAt: true,
         updatedAt: true,
+        primaryChannelId: true,
+        primaryChannel: { select: { slug: true } },
         translations: true,
         channels: { include: { channel: true } },
         tags: { include: { tag: true } },
@@ -266,7 +297,9 @@ export class VideosService {
         audience?: string;
       }>;
       channels?: string[];
+      primaryChannel?: string;
       tags?: string[];
+      newTags?: string[];
     },
   ) {
     const user = await this.prisma.user.findUnique({
@@ -297,6 +330,29 @@ export class VideosService {
       throw new BadRequestException('Video not editable in current status');
     }
 
+    // Resolve and validate taxonomy before opening the transaction. Tag creation
+    // can hit a unique-constraint race, and a failed statement inside a
+    // PostgreSQL transaction would abort the translation writes as well.
+    const channelsProvided = data.channels !== undefined;
+    const channelIds = channelsProvided
+      ? await this.contentTaxonomy.resolveChannelIdsBySlug(data.channels)
+      : [];
+    const primaryChannelId = channelsProvided
+      ? await this.contentTaxonomy.resolvePrimaryChannelId(
+          channelIds,
+          data.primaryChannel,
+        )
+      : undefined;
+
+    const tagsProvided = data.tags !== undefined || data.newTags !== undefined;
+    const tagIds = tagsProvided
+      ? await this.tags.resolveTagIds({
+          slugs: data.tags,
+          newTags: data.newTags,
+          actorUserId: user.id,
+        })
+      : [];
+
     await this.prisma.$transaction(async (tx) => {
       // Update translations
       if (data.translations) {
@@ -326,43 +382,32 @@ export class VideosService {
         }
       }
 
-      // Update channels (by slug)
-      if (data.channels !== undefined) {
+      if (channelsProvided) {
         await tx.videoChannel.deleteMany({ where: { videoId } });
 
-        for (const slug of data.channels) {
-          const channel = await tx.channel.findUnique({
-            where: { slug },
+        if (channelIds.length) {
+          await tx.videoChannel.createMany({
+            data: channelIds.map((channelId) => ({ videoId, channelId })),
           });
-
-          if (channel) {
-            await tx.videoChannel.create({
-              data: {
-                videoId,
-                channelId: channel.id,
-              },
-            });
-          }
         }
+
+        await tx.video.update({
+          where: { id: videoId },
+          data: { primaryChannelId: primaryChannelId ?? null },
+        });
       }
 
-      // Update tags (by slug)
-      if (data.tags !== undefined) {
+      if (tagsProvided) {
         await tx.videoTag.deleteMany({ where: { videoId } });
 
-        for (const slug of data.tags) {
-          const tag = await tx.tag.findUnique({
-            where: { slug },
+        if (tagIds.length) {
+          await tx.videoTag.createMany({
+            data: tagIds.map((tagId) => ({
+              videoId,
+              tagId,
+              addedById: user.id,
+            })),
           });
-
-          if (tag) {
-            await tx.videoTag.create({
-              data: {
-                videoId,
-                tagId: tag.id,
-              },
-            });
-          }
         }
       }
     });

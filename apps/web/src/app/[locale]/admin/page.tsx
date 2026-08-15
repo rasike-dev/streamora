@@ -188,6 +188,18 @@ export default function AdminPage() {
                 Review images and documents
               </div>
             </Link>
+            <Link href={`/${locale}/admin/taxonomy`} className={tile}>
+              <div className="text-sm font-medium">{tAdmin("taxonomy")}</div>
+              <div className="text-xs text-muted-foreground">
+                {tAdmin("taxonomyDescription")}
+              </div>
+            </Link>
+            <Link href={`/${locale}/admin/tags`} className={tile}>
+              <div className="text-sm font-medium">{tAdmin("tags")}</div>
+              <div className="text-xs text-muted-foreground">
+                {tAdmin("tagsDescription")}
+              </div>
+            </Link>
             <Link href={`/${locale}/admin/jobs`} className={tile}>
               <div className="text-sm font-medium">{tAdmin("jobs")}</div>
               <div className="text-xs text-muted-foreground">

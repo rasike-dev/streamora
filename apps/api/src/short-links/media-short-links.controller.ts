@@ -17,7 +17,10 @@ export class MediaShortLinksController {
 
   @Post('media/:id/share')
   @UseGuards(JwtGuard)
-  async createOrGetShortLink(@Param('id') mediaItemId: string, @Req() req: any) {
+  async createOrGetShortLink(
+    @Param('id') mediaItemId: string,
+    @Req() req: any,
+  ) {
     const externalId = req.user.sub;
     const user = await this.shortLinksService.getUserByExternalId(externalId);
     if (!user) throw new NotFoundException('User not found');

@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ChannelsModule } from './channels/channels.module';
 import { TagsModule } from './tags/tags.module';
+import { TaxonomyModule } from './taxonomy/taxonomy.module';
 import { VideosModule } from './videos/videos.module';
 import { UploadsController } from './uploads/uploads.controller';
 import { UploadLimitsController } from './uploads/uploads.limits.controller';
@@ -82,6 +83,7 @@ import { rateLimitConfig } from './common/rate-limit.config';
     AuthModule,
     ChannelsModule,
     TagsModule,
+    TaxonomyModule,
     VideosModule,
     SearchModule,
   ],

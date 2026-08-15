@@ -38,6 +38,27 @@ DATABASE_URL="postgresql://..." pnpm --filter api exec prisma migrate deploy
 
 Always run migrations **before** switching traffic to a new API revision.
 
+### Taxonomy and tag governance rollout
+
+The tag normalization ships as expand → backfill → enforce so no step can fail on production data:
+
+| Order | Migration |
+|-------|-----------|
+| 1 | `20260815060000_enable_pg_trgm_search` |
+| 2 | `20260815061000_add_taxonomy_hierarchy` |
+| 3 | `20260815062000_backfill_tag_normalization` |
+| 4 | `20260815063000_enforce_tag_normalized_unique` |
+| 5 | `20260815064000_renormalize_tag_keys` |
+
+After `migrate deploy`, seed the category tree and check for tags that lost a normalization collision:
+
+```bash
+DATABASE_URL="postgresql://..." pnpm --filter api exec prisma db seed
+pnpm --filter api tag:duplicates   # exits non-zero while duplicates remain
+```
+
+Duplicates are merged from **Admin → Tags**; channels that predate the hierarchy appear under **Admin → Taxonomy → Unmapped** and must be given a subcategory before they can be browsed by category. Full detail in [taxonomy-governance-setup.md](./taxonomy-governance-setup.md).
+
 ## Scheduled publishing
 
 Production uses **Cloud Scheduler**, not in-process cron.

@@ -21,7 +21,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prisma": "prisma",
     "prisma:migrate": "prisma migrate",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "tag:duplicates": "dotenv -e ../../.env -- ts-node prisma/scripts/tag-duplicate-report.ts"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"

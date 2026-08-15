@@ -14,6 +14,7 @@
 4. [Web Interface Testing — All User Flows](#4-web-interface-testing--all-user-flows)
 5. [Security & Edge Case Tests](#5-security--edge-case-tests)
 6. [Complete Endpoint Reference](#6-complete-endpoint-reference)
+7. [Taxonomy & Tag Governance (AC-01 – AC-12)](#7-taxonomy--tag-governance-ac-01--ac-12)
 
 ---
 
@@ -1101,13 +1102,16 @@ WEBVTT
 | GET | `/health` | Health check |
 | GET | `/ready` | Readiness check (DB + Redis) |
 | GET | `/version` | API version |
-| GET | `/videos` | Public video listing with `?q=&channel=&tag=&locale=&page=&pageSize=` |
+| GET | `/videos` | Public video listing with `?q=&category=&subcategory=&channel=&tag=&locale=&page=&pageSize=` |
 | GET | `/videos/:slug/embed` | Embed data for a video |
 | GET | `/videos/:id/playback` | HLS playback URL |
 | GET | `/public/videos/:slug` | Video share page data (OG metadata) |
 | GET | `/public/videos/:slug/embed` | Embed video data (alt route) |
-| GET | `/channels/:slug` | Channel landing page with `?locale=&page=&pageSize=` |
-| GET | `/tags/:slug` | Tag landing page with `?locale=&page=&pageSize=` |
+| GET | `/categories` | Category list with subcategories (localized) |
+| GET | `/categories/:slug` | Category detail with subcategories + video counts |
+| GET | `/categories/:categorySlug/subcategories/:slug` | Subcategory detail with channels + video counts |
+| GET | `/channels/:slug` | Channel landing page with `?locale=&page=&pageSize=`; includes breadcrumb |
+| GET | `/tags/:slug` | Tag landing page with `?locale=&page=&pageSize=`; resolves aliases and merged tags |
 | GET | `/short-links/:code` | Resolve short link to video URL |
 | POST | `/analytics/videos/:id/events` | Track analytics event (rate-limited: 60/min) |
 
@@ -1156,10 +1160,26 @@ WEBVTT
 | POST | `/admin/users/:id/creator-approve` | Approve creator (ADMIN only) |
 | POST | `/admin/users/:id/creator-reject` | Reject creator (ADMIN only) |
 | POST | `/admin/users/:id/notes` | Add notes to creator (ADMIN only) |
-| POST | `/admin/channels` | Create channel (ADMIN only) |
+| POST | `/admin/channels` | Create channel, requires `subcategoryId` (ADMIN only) |
 | PATCH | `/admin/channels/:id` | Update channel (ADMIN only) |
+| POST | `/admin/channels/:id/move` | Re-parent channel to another subcategory (ADMIN only) |
+| GET | `/admin/taxonomy/tree` | Full Category → Subcategory → Channel tree (ADMIN only) |
+| GET | `/admin/taxonomy/unmapped-channels` | Channels with no subcategory (ADMIN only) |
+| GET | `/admin/taxonomy/impact` | Affected content counts before archive/move (ADMIN only) |
+| GET | `/admin/taxonomy/audit` | `TaxonomyAuditLog` entries (ADMIN only) |
+| POST/PATCH | `/admin/categories`, `/admin/categories/:id` | Create / update category (ADMIN only) |
+| POST | `/admin/categories/:id/archive` \| `/restore` | Archive or restore category (ADMIN only) |
+| POST | `/admin/categories/reorder` | Reorder categories (ADMIN only) |
+| POST/PATCH | `/admin/subcategories`, `/admin/subcategories/:id` | Create / update subcategory (ADMIN only) |
+| POST | `/admin/subcategories/:id/archive` \| `/restore` \| `/move` | Archive, restore or re-parent subcategory (ADMIN only) |
+| POST | `/admin/categories/:id/subcategories/reorder` | Reorder within a category (ADMIN only) |
 | POST | `/admin/tags` | Create tag (ADMIN only) |
 | PATCH | `/admin/tags/:id` | Update tag (ADMIN only) |
+| GET | `/admin/tags` | Tag list with usage counts + status filter (ADMIN/MODERATOR) |
+| GET | `/admin/tags/:id/merge-preview` | Impact of a merge before committing (ADMIN/MODERATOR) |
+| POST | `/admin/tags/:id/merge` | Merge into target, alias the losing slug (ADMIN/MODERATOR) |
+| PATCH | `/admin/tags/:id/status` | ACTIVE / PENDING / BLOCKED (ADMIN/MODERATOR) |
+| POST | `/admin/tags/:id/aliases` | Add alias (ADMIN/MODERATOR) |
 | GET | `/admin/jobs` | List processing jobs with `?status=` filter |
 
 ### Frontend Pages
@@ -1171,7 +1191,10 @@ WEBVTT
 | `/[locale]/auth/callback` | None | OAuth callback |
 | `/[locale]/videos` | None | Public video listing with search |
 | `/[locale]/v/[slug]` | None | Video share/watch page (SSR + OG) |
-| `/[locale]/channels/[slug]` | None | Channel landing page |
+| `/[locale]/categories` | None | Category browse index |
+| `/[locale]/categories/[slug]` | None | Category page (subcategories + counts) |
+| `/[locale]/categories/[slug]/[subSlug]` | None | Subcategory page (channels + counts) |
+| `/[locale]/channels/[slug]` | None | Channel landing page (with breadcrumb) |
 | `/[locale]/tags/[slug]` | None | Tag landing page |
 | `/[locale]/embed/[slug]` | None | Embeddable player (iframe) |
 | `/s/[code]` | None | Short link redirect |
@@ -1186,4 +1209,57 @@ WEBVTT
 | `/[locale]/admin` | Admin | Admin panel |
 | `/[locale]/admin/moderation` | Admin | Moderation queue |
 | `/[locale]/admin/jobs` | Admin | Processing jobs dashboard |
+| `/[locale]/admin/taxonomy` | Admin | Category/Subcategory/Channel drill-down console |
+| `/[locale]/admin/tags` | Admin/Moderator | Tag governance console (merge, block, feature) |
 | `/[locale]/watch/[videoId]` | None | Video watch page (by ID) |
+
+---
+
+## 7. Taxonomy & Tag Governance (AC-01 – AC-12)
+
+Acceptance criteria from `Streamora_Taxonomy_Channel_Tag_Governance_Technical_Proposal_v1.0.docx` §21, with the automated coverage that proves each one. Run the automated layer with `pnpm --filter api test`; the manual column is the check to perform against a running stack.
+
+| AC | Criterion | Automated coverage | Manual verification |
+|----|-----------|--------------------|---------------------|
+| AC-01 | Admin can create, edit, reorder and archive Categories | `taxonomy/admin-taxonomy.service.spec.ts` — archive rules, reorder | `/admin/taxonomy`: create a category, rename it, drag order, archive it |
+| AC-02 | Admin can create, edit, move, reorder and archive Subcategories | `taxonomy/admin-taxonomy.service.spec.ts` — archive, move, reorder | Move a subcategory to another category and confirm its channels follow |
+| AC-03 | Admin can create, edit, move, reorder and archive Channels | `taxonomy/admin-taxonomy.service.spec.ts` — move rules | `POST /admin/channels/:id/move`; confirm the channel's videos reclassify |
+| AC-04 | Non-admin uploader cannot create or modify Category/Subcategory/Channel | `auth/taxonomy-permissions.spec.ts` — permission matrix, `RolesGuard` enforcement | Call any `/admin/taxonomy/*` route with a creator token → `403`; confirm the draft editor offers no "create channel" affordance |
+| AC-05 | Authorized uploader can attach existing tags and create new tags during upload/edit | `tags/tags.service.spec.ts`, `videos/videos.service.spec.ts`, `media/media.service.spec.ts` | In the draft editor, pick an existing tag and type a brand-new one; save and reload |
+| AC-06 | Equivalent normalized tags do not create duplicate canonical Tag records | `common/taxonomy/normalize.util.spec.ts`, `tags/tags.service.spec.ts` — includes the concurrent-creation race | Submit `"AI"`, `" #ai "` and `"A.I."` from two drafts; confirm one `Tag` row |
+| AC-07 | Admin/Moderator can rename, merge and block tags | `tags/admin-tags.service.spec.ts`, `auth/taxonomy-permissions.spec.ts` | `/admin/tags`: preview a merge, commit it, then block a tag and confirm it detaches |
+| AC-08 | Video classification resolves from Channel; Category/Subcategory are never independently inconsistent | `taxonomy/content-taxonomy.service.spec.ts` (primary-channel invariant), `taxonomy/taxonomy.service.spec.ts` (breadcrumb), `media/media.service.spec.ts` (media parity) | Re-parent a channel; confirm the breadcrumb on `/v/[slug]` changes without touching the video |
+| AC-09 | Public browse/search can filter by Category, Subcategory, Channel and Tag | `public/public-videos.filters.spec.ts`, `search/search.service.spec.ts` (parameter binding, no double-counting) | `/videos?category=…&subcategory=…&channel=…&tag=…&q=…` in every combination, including with a keyword |
+| AC-10 | Existing Channels/Tags/Videos migrate without reprocessing or content loss | `public/public-tags.service.spec.ts` — alias and merged-slug resolution | Apply migrations to a populated database: video/asset/rendition counts unchanged, no job re-queued, legacy `/tags/{slug}` still resolves |
+| AC-11 | Existing upload → transcode → publish → playback workflow passes regression | `videos/videos.service.spec.ts` — status gate; sections 3 and 4 of this plan | Run the full regression flow end to end (see §3.1–§3.9) |
+| AC-12 | Taxonomy and tag mutations are auditable | `taxonomy/admin-taxonomy.service.spec.ts`, `tags/admin-tags.service.spec.ts` | `GET /admin/taxonomy/audit` after a move, a merge and a status change |
+
+### 7.1 Edge cases
+
+| Test | Action | Expected |
+|------|--------|----------|
+| Unknown channel slug on save | `PATCH /creator/videos/:id` with `channels: ["does-not-exist"]` | `400` — this used to be silently ignored |
+| Inactive channel slug | Archive a channel, then reference it in a draft | `400` |
+| Primary not among channels | `primaryChannel` set to a slug not in `channels` | `400` |
+| Channels emptied | Save with `channels: []` | `primaryChannelId` cleared, not left dangling |
+| Tag ceiling | Submit 16 tags | `400 A maximum of 15 tags can be applied` |
+| Blocked tag | Reference a `BLOCKED` tag slug | `400` |
+| Reserved tag name | Create the tag `admin` | `400 "admin" is a reserved tag name` |
+| Tag name over 60 chars | Create a 61-character tag | `400` |
+| Merged tag slug | `GET /tags/<merged-slug>` | `200` with the target tag and a `redirectedFrom` field |
+| Archive with dependents | Archive a category that still has subcategories | Blocked, with the dependent count reported |
+| Multi-channel double count | Video in 3 channels, filter by its category | Appears exactly once, and `total` matches |
+| Unicode tags | Create tags in Sinhala and Tamil | Slug keeps vowel signs and conjuncts; composed and decomposed forms match as one tag |
+
+### 7.2 Migration checks
+
+```bash
+# Before: record the baseline
+psql "$DATABASE_URL" -c "SELECT count(*) FROM \"Video\"; SELECT count(*) FROM \"Tag\";"
+
+pnpm --filter api exec prisma migrate deploy
+pnpm --filter api exec prisma db seed
+pnpm --filter api tag:duplicates
+```
+
+Expected: video and asset counts unchanged (AC-10), 10 categories seeded, the pre-existing `technology` and `education` channels listed under `GET /admin/taxonomy/unmapped-channels`, and no processing job re-queued.

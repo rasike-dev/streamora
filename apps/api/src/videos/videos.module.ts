@@ -4,9 +4,11 @@ import { VideosService } from './videos.service';
 import { CreatorVideosQueryService } from './creator-videos-query.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { SearchModule } from '../search/search.module';
+import { TaxonomyModule } from '../taxonomy/taxonomy.module';
+import { TagsModule } from '../tags/tags.module';
 
 @Module({
-  imports: [PrismaModule, SearchModule],
+  imports: [PrismaModule, SearchModule, TaxonomyModule, TagsModule],
   controllers: [VideosController],
   providers: [VideosService, CreatorVideosQueryService],
   exports: [VideosService],

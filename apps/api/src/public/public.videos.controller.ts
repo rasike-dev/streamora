@@ -9,6 +9,8 @@ export class PublicVideosController {
   async list(
     @Query('locale') locale = 'en',
     @Query('q') q?: string,
+    @Query('category') category?: string,
+    @Query('subcategory') subcategory?: string,
     @Query('channel') channel?: string,
     @Query('tag') tag?: string,
     @Query('page') page = '1',
@@ -17,6 +19,8 @@ export class PublicVideosController {
     return this.publicVideosService.listVideos({
       locale,
       q,
+      category,
+      subcategory,
       channel,
       tag,
       page: Number(page),

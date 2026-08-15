@@ -6,6 +6,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { TaxonomyService } from '../taxonomy/taxonomy.service';
 import { PublicVideosService } from './public-videos.service';
 
 @Controller()
@@ -13,6 +14,7 @@ export class PublicVideoShareController {
   constructor(
     private prisma: PrismaService,
     private publicVideosService: PublicVideosService,
+    private taxonomy: TaxonomyService,
   ) {}
 
   @Get('public/videos/:slug')
@@ -25,8 +27,24 @@ export class PublicVideoShareController {
       include: {
         translations: true,
         uploader: true,
-        channels: { include: { channel: true } },
-        tags: { include: { tag: true } },
+        channels: {
+          include: {
+            channel: {
+              include: {
+                translations: { where: { locale: { in: [locale, 'en'] } } },
+              },
+            },
+          },
+        },
+        tags: {
+          include: {
+            tag: {
+              include: {
+                translations: { where: { locale: { in: [locale, 'en'] } } },
+              },
+            },
+          },
+        },
         subtitles: true,
       },
     });
@@ -79,6 +97,12 @@ export class PublicVideoShareController {
         : `https://storage.googleapis.com/${thumb.bucket}/${thumb.objectKey}`
       : null;
 
+    // Breadcrumb comes from the primary channel; videos that predate the
+    // taxonomy simply have no trail rather than a guessed one.
+    const breadcrumb = v.primaryChannelId
+      ? await this.taxonomy.getChannelBreadcrumb(v.primaryChannelId, locale)
+      : null;
+
     const subtitles = v.subtitles.map((sub) => ({
       locale: sub.locale,
       url: cdnBase
@@ -97,13 +121,18 @@ export class PublicVideoShareController {
       createdAt: v.createdAt,
       playbackUrl: masterUrl,
       thumbnailUrl: thumbUrl,
+      breadcrumb,
       channels: v.channels.map((c) => ({
         slug: c.channel.slug,
-        name: c.channel.name,
+        name: this.taxonomy.localize(
+          c.channel.translations,
+          locale,
+          c.channel.name,
+        ),
       })),
       tags: v.tags.map((x) => ({
         slug: x.tag.slug,
-        name: x.tag.name,
+        name: this.taxonomy.localize(x.tag.translations, locale, x.tag.name),
       })),
       subtitles,
     };

@@ -35,7 +35,9 @@ export class MediaScheduleService {
       throw new ForbiddenException('Not authorized');
     }
     if (!SCHEDULE_EDITABLE_STATUSES.includes(item.status)) {
-      throw new BadRequestException('Schedule cannot be changed in current status');
+      throw new BadRequestException(
+        'Schedule cannot be changed in current status',
+      );
     }
 
     let parsed: Date | null = null;

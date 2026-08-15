@@ -2,6 +2,8 @@
 
 Streamora uses [Clerk](https://clerk.com) for stakeholder authentication.
 
+For the full role model, approval rules, and video lifecycle design, see [`full-context.md`](./full-context.md) and [`architecture-summary.md`](./architecture-summary.md). For onboarding a new stakeholder end-to-end, see [`stakeholder-onboarding.md`](./stakeholder-onboarding.md).
+
 ## Quick start with the Clerk agent (recommended)
 
 This repo includes official Clerk agent tooling:

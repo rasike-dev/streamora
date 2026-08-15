@@ -78,6 +78,7 @@ export default async function VideoSharePage({
   const t = await getTranslations({ locale, namespace: "videoDetail" });
   const tCommon = await getTranslations({ locale, namespace: "common" });
   const tVideos = await getTranslations({ locale, namespace: "videosPage" });
+  const tTaxonomy = await getTranslations({ locale, namespace: "taxonomy" });
 
   const video = await getVideo(locale, slug);
 
@@ -136,6 +137,35 @@ export default async function VideoSharePage({
 
       <main className="flex-1">
         <PageFrame>
+          {video.breadcrumb?.category && video.breadcrumb?.subcategory ? (
+            <nav className="mb-4 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+              <Link href={`/${locale}/categories`} className="hover:underline">
+                {tTaxonomy("categories")}
+              </Link>
+              <span>/</span>
+              <Link
+                href={`/${locale}/categories/${video.breadcrumb.category.slug}`}
+                className="hover:underline"
+              >
+                {video.breadcrumb.category.name}
+              </Link>
+              <span>/</span>
+              <Link
+                href={`/${locale}/categories/${video.breadcrumb.category.slug}/${video.breadcrumb.subcategory.slug}`}
+                className="hover:underline"
+              >
+                {video.breadcrumb.subcategory.name}
+              </Link>
+              <span>/</span>
+              <Link
+                href={`/${locale}/channels/${video.breadcrumb.channel.slug}`}
+                className="hover:underline"
+              >
+                {video.breadcrumb.channel.name}
+              </Link>
+            </nav>
+          ) : null}
+
           <PageHeading
             title={video.title || t("untitled")}
             description={video.tagline || undefined}
@@ -197,9 +227,17 @@ export default async function VideoSharePage({
                 </div>
               )}
               {video.tags?.length > 0 && (
-                <div className="text-xs text-muted-foreground">
-                  {t("tagsLabel")}{" "}
-                  {video.tags.map((tg: any) => tg.name).join(", ")}
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>{t("tagsLabel")}</span>
+                  {video.tags.map((tg: any) => (
+                    <Link
+                      key={tg.slug}
+                      href={`/${locale}/tags/${tg.slug}?src=tag`}
+                      className="rounded-full border border-black/10 px-2 py-0.5 hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+                    >
+                      {tg.name}
+                    </Link>
+                  ))}
                 </div>
               )}
             </div>

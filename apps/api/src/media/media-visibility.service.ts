@@ -38,7 +38,9 @@ export class MediaVisibilityService {
       throw new ForbiddenException('Not authorized');
     }
     if (!VISIBILITY_EDITABLE_STATUSES.includes(item.status)) {
-      throw new BadRequestException('Visibility cannot be changed in current status');
+      throw new BadRequestException(
+        'Visibility cannot be changed in current status',
+      );
     }
 
     const updated = await this.prisma.mediaItem.update({

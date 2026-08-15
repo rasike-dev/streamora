@@ -1,5 +1,11 @@
 # Ultimate Design — GCP Self-Managed Video Uploading Platform
 
+> **Canonical architecture & implementation reference** (linked from the root [`README.md`](../README.md)).
+>
+> **Status (August 2026):** Phases **0–3 complete** (Days 1–27). Core product loop is implemented end-to-end: upload → process → moderate → publish → discover → share → analytics → govern. Auth is **Clerk** (Keycloak docs under `docs/keycloak-*` are legacy).
+>
+> **Companion docs:** [`architecture-summary.md`](./architecture-summary.md) (technical deep dive) · [`product-features-overview.md`](./product-features-overview.md) (stakeholder feature guide) · [`test-plan.md`](./test-plan.md) (verification) · [`stakeholder-onboarding.md`](./stakeholder-onboarding.md) · [`production-runbook.md`](./production-runbook.md) · [`clerk-setup.md`](./clerk-setup.md)
+
 ## 1. Core Goals
 
 - **Mobile-first upload + share**: Fast and resilient (resumable, retry, drafts, bulk)
@@ -39,9 +45,10 @@
 - **Cloud CDN + HTTPS Load Balancer** in front of HLS/thumbnail buckets
 
 ### Auth / RBAC / Social Login
-- **Keycloak** (self-hosted on GCE or GKE)
-- Social identity brokering (Google/Facebook/etc.)
-- Admin-controlled verification + role assignment
+- **Clerk** (managed IdP) — see [`clerk-setup.md`](./clerk-setup.md)
+- Email + Google sign-in; invite-only stakeholder onboarding
+- Roles in JWT `publicMetadata.roles`: `VIEWER`, `CREATOR_PENDING`, `CREATOR_APPROVED`, `MODERATOR`, `ADMIN`
+- Admin-controlled creator verification + role promotion via API (`POST /admin/users/:id/creator-approve`)
 
 ### Observability
 - **Cloud Logging + Cloud Monitoring + Error Reporting**
@@ -133,7 +140,9 @@
 ## 7. Discovery Features
 
 - **Full search with facets**:
-  - channel, tags, duration range, date, popularity, visibility
+  - category, subcategory, channel, tags, duration range, date, popularity, visibility
+- **Category browse**: `/categories`, `/categories/{slug}`, `/categories/{slug}/{subSlug}` with video counts
+- **Breadcrumbs**: category → subcategory → channel on share and channel pages, resolved from the video's primary channel
 - **Channel pages**:
   - cover image, description
   - featured/pinned videos
@@ -211,9 +220,11 @@
 - Manage captions (upload VTT/SRT)
 
 ### Taxonomy Management
-- Channels CRUD + ordering + cover images
-- Tags CRUD + preferred tags
-- Tag merge/synonyms ("AI", "A.I.")
+- Category → Subcategory → Channel hierarchy, CRUD + reorder + archive/restore + move with impact preview ✅
+- Channels CRUD + ordering + cover images ✅
+- Tags CRUD + preferred (featured) tags ✅
+- Tag merge/synonyms ("AI", "A.I.") with alias-preserving slugs ✅
+- Tag status governance (`ACTIVE` / `PENDING` / `BLOCKED` / `MERGED`) ✅
 - Bulk apply tags/channel
 
 ### Reports & Abuse
@@ -247,10 +258,13 @@
 - `captions` (lang, format, path)
 
 ### Metadata
-- `channels`
-- `tags`
-- `video_channels`
-- `video_tags`
+- `categories`, `category_translations`
+- `subcategories`, `subcategory_translations`
+- `channels` (`subcategory_id`)
+- `tags` (`normalized_name` unique, `status`, `merged_into_tag_id`)
+- `tag_aliases`
+- `video_channels`, `video_tags` (plus `primary_channel_id` on `videos` / `media_items`)
+- `taxonomy_audit_log`
 
 ### Moderation & Compliance
 - `moderation_reviews` (checklists, notes, decisions)
@@ -298,11 +312,17 @@
 - `POST /admin/videos/{id}/reprocess`
 
 ### Taxonomy
+- `GET /categories`, `GET /categories/{slug}`, `GET /categories/{categorySlug}/subcategories/{slug}`
 - `GET /channels`
 - `POST /admin/channels`
 - `PATCH /admin/channels/{id}`
+- `POST /admin/channels/{id}/move` (re-parent to another subcategory)
+- `GET /admin/taxonomy/tree`, `/unmapped-channels`, `/impact`, `/audit`
+- `POST|PATCH /admin/categories`, `POST /admin/categories/{id}/archive|restore`, `POST /admin/categories/reorder`
+- `POST|PATCH /admin/subcategories`, `POST /admin/subcategories/{id}/archive|restore|move`
 - `POST /admin/tags`
-- `POST /admin/tags/merge`
+- `GET /admin/tags/{id}/merge-preview`, `POST /admin/tags/{id}/merge`
+- `PATCH /admin/tags/{id}/status`, `POST /admin/tags/{id}/aliases`
 
 ### External
 - `POST /external-videos` (link ingest)
@@ -347,27 +367,27 @@
 - API responds `/health`
 - DB container reachable
 
-### Day 2 — Auth & RBAC Skeleton (Keycloak Integration)
+### Day 2 — Auth & RBAC Skeleton ✅ (implemented with **Clerk**)
+
+**Original plan**: Keycloak. **As built**: Clerk — see [`clerk-setup.md`](./clerk-setup.md).
 
 **Goals**: Login works, JWT validated by API, role guards exist.
 
-**Tasks**:
-- Deploy Keycloak locally (docker) + realm export baseline
-- Configure social login placeholders (real later)
-- Define roles: `ADMIN`, `MODERATOR`, `CREATOR_PENDING`, `CREATOR_APPROVED`, `VIEWER`
+**Tasks (as built)**:
+- Clerk application + JWT template `streamora-api` with `roles` from `publicMetadata`
+- Roles: `ADMIN`, `MODERATOR`, `CREATOR_PENDING`, `CREATOR_APPROVED`, `VIEWER`
 - API:
-  - JWT validation middleware/guard
+  - JWT validation middleware/guard (`jose` + Clerk JWKS)
   - `@Roles()` decorator + RolesGuard
-  - `GET /me` returns user + roles
+  - `GET /me` returns user + roles; provisions local `User` on first call
 - Web:
-  - Login button → Keycloak
-  - Callback handling
-  - Session storage strategy (cookie or token storage)
+  - Clerk sign-in at `/[locale]/sign-in`
+  - Role-gated dashboard and admin areas
 
 **Deliverables**: User can login and see role-based UI areas.
 
 **Acceptance Checks**:
-- Access `/admin` blocked unless ADMIN
+- Access `/admin` blocked unless ADMIN/MODERATOR
 - `/me` returns correct roles
 
 ### Day 3 — Database Baseline + Core Entities
@@ -384,7 +404,7 @@
   - `channels` (name, slug, active, sortOrder)
   - `tags` (name, preferred)
 - API seeds:
-  - default admin user mapping strategy (Keycloak subject → app user)
+  - default admin user mapping strategy (Clerk `sub` → app user via `externalId`)
   - seed channels/tags
 
 **Deliverables**: API can read/write channels/tags.
@@ -681,42 +701,79 @@ Premium features: drafts, bulk upload, thumbnail picker, visibility modes, sched
 
 ---
 
-## Phase 3 — Power Backoffice + Reliability (Days 19–28)
+## Phase 3 — Power Backoffice + Distribution (Days 22–27) ✅
 
-**Goals**: Admin comfort + operational stability.
+**Goals**: Discovery polish, distribution tools, moderation feedback loop, post-publication governance.
 
-**Add**:
-- Audit log (role changes, approvals, takedowns, deletes, reprocess)
-- User management (suspend/disable, quotas override, internal notes)
-- Reprocess + retry + DLQ viewer
-- Reports flow (report video/user → moderation)
-- Rate limiting + quotas enforced
+### Day 22 — Tag Landing Pages ✅
+
+**Deliverables**: Public `/tags/{slug}` pages with locale-aware metadata, paginated `PUBLISHED + PUBLIC` grids, SEO metadata, analytics `?src=tag` attribution.
+
+### Day 23 — Short Share Links ✅
+
+**Deliverables**: `ShortLink` model, `POST /creator/videos/:id/share` (idempotent), public `GET /short-links/:code` redirect to canonical video URL with `?src=share`, web routes `/s/{code}` and `/m/{code}`, copy-to-clipboard in share UI.
+
+### Day 24 — Embed Player ✅
+
+**Deliverables**: `GET /public/videos/:slug/embed` (PUBLISHED + PUBLIC only), minimal iframe player at `/[locale]/embed/[slug]`, `EXTERNAL` analytics source, CSP/frame headers for embedding, copy-embed-code on share and creator edit pages.
+
+### Day 25 — Moderation Improvements ✅
+
+**Deliverables**: Structured rejection with `rejectionReason` / `rejectionNote` / timestamps, creator UI shows rejection feedback, admin queue displays rejection context.
+
+### Day 26 — Resubmission Flow ✅
+
+**Deliverables**: `POST /creator/videos/:id/resubmit` from `REJECTED` → `PENDING_APPROVAL`, `moderationVersion` + `resubmittedAt`, creator resubmit button, admin queue revision badges and prior rejection context.
+
+### Day 27 — Content Governance ✅
+
+**Deliverables**: Takedown / archive / restore for `PUBLISHED` videos, governance fields on `Video`, `VideoAuditLog` + `VideoAuditAction` enum, admin governance endpoints, creator/admin UI panels, public APIs exclude `TAKEDOWN` / `ARCHIVED`.
+
+**Acceptance**: Published video can be taken down or archived with reason; restored videos can return to `PUBLISHED`; audit trail persisted.
 
 ---
 
-## Phase 4 — Growth & "Ultimate" (After)
+## Beyond the day plan (also implemented)
 
-**Add**:
-- Analytics dashboards (creator + admin)
-- Trending/related/watch history
-- Embeddable player + domain allowlist
-- Captions workflow (upload now, auto-caption later)
-- DMCA/takedown case management (if needed)
+| Feature | Summary |
+|---------|---------|
+| **Subtitles** | Creator upload `.vtt`/`.srt` per locale (en/si/ta); player CC support; `VideoSubtitle` model |
+| **Media items** | Parallel ingest for `IMAGE` and `DOCUMENT` assets (`MediaItem`); creator upload at `/upload/media`, moderation at `/admin/media-moderation`; shares moderation/governance patterns with video |
+| **Clerk migration** | Replaced Keycloak; no local IdP container; roles synced on creator approval |
+| **Day 2.5** | i18n (en/si/ta) via `next-intl`, locale routing, translation tables |
+| **Taxonomy & tag governance** | Admin-governed Category → Subcategory → Channel hierarchy with localized names, `primaryChannelId` for deterministic breadcrumbs, contributor tag creation with normalization and merge/block/alias governance, `/categories` browse routes, category and subcategory filters on `/videos`. See [taxonomy-governance-setup.md](./taxonomy-governance-setup.md) |
+
+---
+
+## Phase 4 — Growth & "Ultimate" (Not yet / partial)
+
+| Feature | Status |
+|---------|--------|
+| Analytics dashboards (creator + admin) | **Done** (Days 20–21) |
+| Embeddable player | **Done** (Day 24; domain allowlist not yet) |
+| Captions upload workflow | **Done** (subtitles); auto-caption (Speech-to-Text) **not yet** |
+| Takedown / archive governance | **Done** (Day 27); full DMCA case management **not yet** |
+| Trending / related / watch history | **Not yet** |
+| User suspend/disable + internal notes UI | **Partial** (creator approve exists; full user mgmt **not yet**) |
+| Reports / abuse flow | **Not yet** |
+| Production Redis rate limiting | **Planned** (compose has Redis locally) |
+| Full-text search (tsvector / Elasticsearch) | **Not yet** (ILIKE search works for current scale) |
+| External link ingest (YouTube/Vimeo embed) | **Not yet** (in original vision) |
 
 ---
 
 ## Technical Stack Summary
 
-- **Frontend**: Next.js 14+ (App Router), PWA, TypeScript
-- **Backend**: NestJS, TypeScript
-- **Database**: PostgreSQL (Cloud SQL), Prisma ORM
-- **Cache/Queue**: Redis (Memorystore)
-- **Storage**: Google Cloud Storage
-- **Processing**: Cloud Run Jobs (FFmpeg)
-- **Auth**: Keycloak
-- **CDN**: Cloud CDN
+- **Frontend**: Next.js 14+ (App Router), PWA, TypeScript, Tailwind, `next-intl`, hls.js
+- **Backend**: NestJS, TypeScript, Prisma
+- **Database**: PostgreSQL (Cloud SQL locally via Docker Compose)
+- **Cache/Queue**: Redis (Memorystore target; local compose for dev)
+- **Storage**: Google Cloud Storage (originals, renditions, thumbnails, subtitles)
+- **Processing**: Worker + FFmpeg via Pub/Sub (Cloud Run Jobs in prod)
+- **Auth**: **Clerk** (JWT/JWKS validation in API)
+- **CDN**: Cloud CDN (production target for HLS/thumbs)
 - **Events**: Pub/Sub
-- **Monitoring**: Cloud Logging, Cloud Monitoring, Error Reporting
+- **Monitoring**: Cloud Logging, Cloud Monitoring, Error Reporting; correlation IDs API → worker
 
 ---
 

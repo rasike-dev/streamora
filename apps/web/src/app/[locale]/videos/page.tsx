@@ -7,6 +7,7 @@ import {
   UserBanner,
 } from "@/components/layout";
 import { SiteHeader } from "@/components/layout/site-header";
+import PublicVideoFilters from "@/components/public-video-filters";
 import { getPublicVideos } from "@/lib/api/public-videos";
 
 const surfaceCard =
@@ -14,8 +15,6 @@ const surfaceCard =
 const surfaceTile =
   "overflow-hidden rounded-2xl border border-black/10 bg-black/[0.02] shadow-sm transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.04]";
 const thumbBg = "aspect-video bg-black/5 dark:bg-white/10";
-const btnPrimary =
-  "rounded-xl bg-foreground px-4 py-2 text-sm font-medium text-background hover:opacity-90";
 const btnGhost =
   "rounded-xl border border-black/15 px-4 py-2 text-sm font-medium hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]";
 const btnMuted =
@@ -25,6 +24,8 @@ type Props = {
   params: Promise<{ locale: string }>;
   searchParams: Promise<{
     q?: string;
+    category?: string;
+    subcategory?: string;
     channel?: string;
     tag?: string;
     page?: string;
@@ -39,6 +40,8 @@ export default async function VideosPage({ params, searchParams }: Props) {
   const tErrors = await getTranslations({ locale, namespace: "errors" });
 
   const q = sp.q ?? "";
+  const category = sp.category ?? "";
+  const subcategory = sp.subcategory ?? "";
   const channel = sp.channel ?? "";
   const tag = sp.tag ?? "";
   const page = Number(sp.page ?? "1");
@@ -49,6 +52,8 @@ export default async function VideosPage({ params, searchParams }: Props) {
     data = await getPublicVideos({
       locale,
       q: q || undefined,
+      category: category || undefined,
+      subcategory: subcategory || undefined,
       channel: channel || undefined,
       tag: tag || undefined,
       page,
@@ -62,7 +67,14 @@ export default async function VideosPage({ params, searchParams }: Props) {
     };
   }
 
-  const filtered = Boolean(q || channel || tag);
+  const filtered = Boolean(q || category || subcategory || channel || tag);
+  const pageParams = {
+    ...(q ? { q } : {}),
+    ...(category ? { category } : {}),
+    ...(subcategory ? { subcategory } : {}),
+    ...(channel ? { channel } : {}),
+    ...(tag ? { tag } : {}),
+  };
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -95,59 +107,10 @@ export default async function VideosPage({ params, searchParams }: Props) {
 
           {!loadError ? (
             <>
-              <form
-                method="get"
-                action={`/${locale}/videos`}
-                className={`${surfaceCard} space-y-4`}
-              >
-                <div className="grid gap-3 md:grid-cols-4">
-                  <input
-                    name="q"
-                    defaultValue={q}
-                    placeholder={t("searchPlaceholder")}
-                    className="rounded-xl border border-black/15 bg-background px-3 py-2 text-sm md:col-span-2 dark:border-white/15"
-                  />
-                  <input
-                    name="channel"
-                    defaultValue={channel}
-                    placeholder={t("channelPlaceholder")}
-                    className="rounded-xl border border-black/15 bg-background px-3 py-2 text-sm dark:border-white/15"
-                  />
-                  <input
-                    name="tag"
-                    defaultValue={tag}
-                    placeholder={t("tagPlaceholder")}
-                    className="rounded-xl border border-black/15 bg-background px-3 py-2 text-sm dark:border-white/15"
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button type="submit" className={btnPrimary}>
-                    {t("search")}
-                  </button>
-                  <Link href={`/${locale}/videos`} className={btnGhost}>
-                    {t("clear")}
-                  </Link>
-                </div>
-              </form>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {q ? (
-                  <span className="rounded-full border border-black/10 px-3 py-1 text-xs dark:border-white/15">
-                    q: {q}
-                  </span>
-                ) : null}
-                {channel ? (
-                  <span className="rounded-full border border-black/10 px-3 py-1 text-xs dark:border-white/15">
-                    channel: {channel}
-                  </span>
-                ) : null}
-                {tag ? (
-                  <span className="rounded-full border border-black/10 px-3 py-1 text-xs dark:border-white/15">
-                    tag: {tag}
-                  </span>
-                ) : null}
-              </div>
+              <PublicVideoFilters
+                locale={locale}
+                initial={{ q, category, subcategory, channel, tag }}
+              />
 
               <section className="mt-6">
                 {data.items.length === 0 ? (
@@ -219,9 +182,7 @@ export default async function VideosPage({ params, searchParams }: Props) {
                   {data.pagination.page > 1 ? (
                     <Link
                       href={`/${locale}/videos?${new URLSearchParams({
-                        ...(q ? { q } : {}),
-                        ...(channel ? { channel } : {}),
-                        ...(tag ? { tag } : {}),
+                        ...pageParams,
                         page: String(data.pagination.page - 1),
                       }).toString()}`}
                       className={btnGhost}
@@ -235,9 +196,7 @@ export default async function VideosPage({ params, searchParams }: Props) {
                   {data.pagination.page < data.pagination.totalPages ? (
                     <Link
                       href={`/${locale}/videos?${new URLSearchParams({
-                        ...(q ? { q } : {}),
-                        ...(channel ? { channel } : {}),
-                        ...(tag ? { tag } : {}),
+                        ...pageParams,
                         page: String(data.pagination.page + 1),
                       }).toString()}`}
                       className={btnGhost}

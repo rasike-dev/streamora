@@ -15,7 +15,9 @@ export async function writeMediaAuditLog(
       mediaItemId: input.mediaItemId,
       action: input.action,
       actorUserId: input.actorUserId,
-      metadata: (input.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
+      metadata: (input.metadata ?? undefined) as
+        | Prisma.InputJsonValue
+        | undefined,
     },
   });
 }

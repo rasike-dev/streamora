@@ -78,7 +78,10 @@ export class UploadCompleteV2Controller {
     let contentType = meta.contentType || intent.contentType;
 
     if (intent.targetKind === 'MEDIA' && intent.mediaItem) {
-      const [buffer] = await file.download({ start: 0, end: Math.min(actualSize, 8192) - 1 });
+      const [buffer] = await file.download({
+        start: 0,
+        end: Math.min(actualSize, 8192) - 1,
+      });
       contentType = await validateUploadedMediaContent(
         intent.mediaItem.kind,
         contentType,
@@ -166,7 +169,9 @@ export class UploadCompleteV2Controller {
     actualSize: number,
   ) {
     const jobType =
-      intent.mediaItem?.kind === 'IMAGE' ? 'IMAGE_DERIVATIVES' : 'DOC_THUMBNAIL';
+      intent.mediaItem?.kind === 'IMAGE'
+        ? 'IMAGE_DERIVATIVES'
+        : 'DOC_THUMBNAIL';
 
     await this.prisma.$transaction(async (tx) => {
       await tx.uploadIntent.update({
@@ -213,8 +218,7 @@ export class UploadCompleteV2Controller {
       });
     });
 
-    const topic =
-      process.env.PUBSUB_TOPIC_MEDIA_UPLOADED || 'media.uploaded';
+    const topic = process.env.PUBSUB_TOPIC_MEDIA_UPLOADED || 'media.uploaded';
 
     await this.pubsub.publish(topic, {
       type: 'media.uploaded',

@@ -134,8 +134,24 @@ pnpm test    # API unit tests (passes when no tests are present)
 
 ## Implementation Phases
 
-See [docs/full-context.md](docs/full-context.md) for complete architecture and implementation plan.
+See [docs/full-context.md](docs/full-context.md) for complete architecture, design, and implementation status.
 
 - **Phase 0** (Days 1-4): Foundations
 - **Phase 1** (Days 5-12): MVP Core
 - **Phase 2** (Days 13-21): Premium Layer
+- **Phase 3** (Days 22-27): Distribution + Governance
+- **Post-27**: Subtitles, media items, and taxonomy & tag governance
+
+## Documentation
+
+| Document | Contents |
+|----------|----------|
+| [docs/full-context.md](docs/full-context.md) | Architecture, roles, lifecycle, all phases |
+| [docs/architecture-summary.md](docs/architecture-summary.md) | Technical deep dive |
+| [docs/product-features-overview.md](docs/product-features-overview.md) | Feature guide (stakeholders) |
+| [docs/test-plan.md](docs/test-plan.md) | Verification checklist |
+| [docs/stakeholder-onboarding.md](docs/stakeholder-onboarding.md) | Invite → publish workflow |
+| [docs/production-runbook.md](docs/production-runbook.md) | Staging/prod operations |
+| [docs/clerk-setup.md](docs/clerk-setup.md) | Auth setup |
+| [docs/taxonomy-governance-setup.md](docs/taxonomy-governance-setup.md) | Category/Subcategory/Channel hierarchy, tag governance, migration order |
+| [infra/README.md](infra/README.md) | GCP mapping and environments |

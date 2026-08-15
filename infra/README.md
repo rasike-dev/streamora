@@ -2,7 +2,19 @@
 
 This folder documents **how Streamora maps to GCP** and how environments are organized. It complements the root [`docker-compose.yml`](../docker-compose.yml), which runs **local-only** dependencies.
 
-For the phased delivery checklist, see Phase 0 Day 4 in [`docs/full-context.md`](../docs/full-context.md).
+For the phased delivery checklist and **complete feature inventory** (Days 1–27), see [`docs/full-context.md`](../docs/full-context.md).
+
+## Related documentation
+
+| Document | Contents |
+|----------|----------|
+| [`docs/full-context.md`](../docs/full-context.md) | Architecture, roles, lifecycle, phased implementation (canonical) |
+| [`docs/architecture-summary.md`](../docs/architecture-summary.md) | Technical stack decisions, data model, flows |
+| [`docs/product-features-overview.md`](../docs/product-features-overview.md) | Stakeholder-facing feature guide |
+| [`docs/clerk-setup.md`](../docs/clerk-setup.md) | Auth provisioning |
+| [`docs/production-runbook.md`](../docs/production-runbook.md) | Deploy, migrate, ops |
+| [`docs/test-plan.md`](../docs/test-plan.md) | Manual verification checklist |
+| [`docs/stakeholder-onboarding.md`](../docs/stakeholder-onboarding.md) | Invite → publish workflow |
 
 ## Environments
 

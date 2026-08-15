@@ -15,7 +15,6 @@ export class ScheduledPublisherService {
   }
 
   async publishDueVideos() {
-    const now = new Date();
     await this.publishDue('video');
     await this.publishDue('media');
   }

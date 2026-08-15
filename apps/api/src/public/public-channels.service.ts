@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { TaxonomyService } from '../taxonomy/taxonomy.service';
 
 @Injectable()
 export class PublicChannelsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly taxonomy: TaxonomyService,
+  ) {}
 
   private toPublicUrl(bucket: string, objectKey: string) {
     const cdnBase =
@@ -43,6 +47,11 @@ export class PublicChannelsService {
     const translated =
       channel.translations.find((t) => t.locale === opts.locale) ??
       channel.translations.find((t) => t.locale === 'en');
+
+    const breadcrumb = await this.taxonomy.getChannelBreadcrumb(
+      channel.id,
+      opts.locale,
+    );
 
     const where = {
       status: 'PUBLISHED' as const,
@@ -85,6 +94,7 @@ export class PublicChannelsService {
         name: translated?.name ?? channel.name,
         description: translated?.description ?? null,
       },
+      breadcrumb,
       pagination: {
         page,
         pageSize,

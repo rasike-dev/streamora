@@ -35,7 +35,7 @@ The platform is designed around three core principles: **mobile-first upload UX*
 │   │         │          │                                                        │
 │   ▼         ▼          ▼                                                        │
 │ ┌─────┐ ┌──────┐ ┌─────────┐                                                   │
-│ │ DB  │ │Pub/  │ │Keycloak │                                                    │
+│ │ DB  │ │Pub/  │ │ Clerk   │                                                    │
 │ │Postgres│Sub  │ │  IAM    │                                                    │
 │ └─────┘ └──┬───┘ └─────────┘                                                   │
 │            │                                                                    │
@@ -94,7 +94,7 @@ The platform is designed around three core principles: **mobile-first upload UX*
 **Reasoning**:
 - **TypeScript end-to-end**: Same language as the frontend, enabling shared type contracts via `@streamora/shared`. A Go or Java API would introduce a language boundary and require separate DTO generation.
 - **NestJS module system**: The application is decomposed into feature modules (`AuthModule`, `VideosModule`, `ChannelsModule`, `TagsModule`) with explicit dependency injection. This enforces separation of concerns — for example, the `PrismaModule` is shared across all feature modules but the `GcsService` is only injected where storage access is needed.
-- **Decorator-based RBAC**: Custom `@Roles('ADMIN', 'MODERATOR')` decorator combined with `RolesGuard` provides declarative authorization at the controller level. The guard reads roles from the JWT's `realm_access.roles` claim, meaning role assignments are centralized in Keycloak.
+- **Decorator-based RBAC**: Custom `@Roles('ADMIN', 'MODERATOR')` decorator combined with `RolesGuard` provides declarative authorization at the controller level. The guard reads roles from the JWT `roles` claim (from Clerk `publicMetadata.roles`), meaning role assignments are managed in Clerk and reflected in API tokens.
 - **Middleware for observability**: `RequestIdMiddleware` generates or propagates `x-request-id` across the entire request lifecycle. This correlation ID is logged in API controllers and forwarded in Pub/Sub messages to the worker, enabling distributed tracing without a full tracing SDK.
 
 **Why not microservices**: At the current scale (single-digit team, ~60 API endpoints), a modular monolith in NestJS provides the benefits of logical separation without the operational cost of inter-service networking, distributed transactions, and independent deployments. The module boundaries (auth, videos, uploads, admin, public) are designed as future extraction points if horizontal scaling of specific domains becomes necessary.
@@ -115,17 +115,19 @@ The platform is designed around three core principles: **mobile-first upload UX*
 
 ---
 
-### 3.5 Authentication — Keycloak (Self-Hosted)
+### 3.5 Authentication — Clerk (Managed IdP)
 
-**Choice**: Keycloak 24 as the identity provider, with JWT validation in the API using the `jose` library.
+**Choice**: [Clerk](https://clerk.com) as the identity provider, with JWT validation in the API using the `jose` library and a Clerk JWT template named `streamora-api`.
 
 **Reasoning**:
-- **Social login brokering**: Keycloak acts as a federation hub — it can broker Google, Facebook, and Apple logins without the API needing provider-specific OAuth flows. Adding a new social provider is a Keycloak configuration change, not a code deployment.
-- **Self-hosted over Firebase Auth/Auth0**: Full control over user data, no per-MAU pricing, and the ability to customize the login flow (e.g., custom approval workflows). Keycloak runs as a Docker container in development and can be deployed to GCE/GKE in production.
-- **JWT validation with JWKS**: The `JwtGuard` uses `jose.jwtVerify` with a remote JWKS endpoint (`/protocol/openid-connect/certs`). This means the API never stores Keycloak secrets — it validates tokens using public key cryptography. The JWKS client caches keys and rate-limits fetch requests (5/minute) to prevent thundering-herd on Keycloak.
-- **Roles in JWT claims**: Keycloak embeds realm roles in the `realm_access.roles` array within the JWT. The API reads these directly from the token, avoiding a database lookup on every request. Role changes take effect at next token refresh (configurable TTL).
+- **Faster stakeholder onboarding**: Invite-only sign-up, email + Google, no self-hosted IdP to operate locally or in production.
+- **Roles in public metadata**: Clerk stores Streamora roles in `publicMetadata.roles` (`CREATOR_PENDING`, `CREATOR_APPROVED`, `ADMIN`, etc.). The JWT template exposes them as a `roles` claim for the API.
+- **JWT validation with JWKS**: The `JwtGuard` uses `jose.jwtVerify` against Clerk's JWKS URL. The API never stores Clerk signing secrets — only issuer, audience, and JWKS endpoint in env.
+- **Creator approval sync**: `POST /admin/users/:id/creator-approve` updates Postgres and promotes Clerk metadata to `CREATOR_APPROVED` automatically.
 
-**Dual-guard pattern**: The API has two guards — `JwtGuard` (authentication: "who are you?") and `RolesGuard` (authorization: "are you allowed?"). Public endpoints omit both. Creator endpoints use only `JwtGuard`. Admin endpoints stack both with `@Roles('ADMIN', 'MODERATOR')`.
+**Dual-guard pattern**: The API has two guards — `JwtGuard` (authentication) and `RolesGuard` (authorization). Public endpoints omit both. Creator endpoints use only `JwtGuard`. Admin endpoints stack both with `@Roles('ADMIN', 'MODERATOR')`.
+
+See [`clerk-setup.md`](./clerk-setup.md) for provisioning steps.
 
 ---
 
@@ -240,9 +242,15 @@ User ─────────────┬── UserRole (many: ADMIN, MOD
                   ├── CreatorProfile (one: approval status, quotas)
                   └── Video[] (one-to-many: uploader)
 
+Category ─────────── CategoryTranslation[]
+   └── Subcategory ── SubcategoryTranslation[]
+          └── Channel (subcategoryId, nullable for legacy rows)
+
 Video ────────────┬── VideoTranslation[] (one-per-locale: title, desc, tagline)
                   ├── VideoChannel[] ──── Channel ── ChannelTranslation[]
+                  ├── primaryChannelId ── Channel (classification + breadcrumb)
                   ├── VideoTag[] ──────── Tag ────── TagTranslation[]
+                  │                        └── TagAlias[] / mergedIntoTagId
                   ├── UploadIntent[] (tracks upload sessions, resumability)
                   ├── VideoAsset (one: original + HLS pointers)
                   ├── VideoThumbnail[] (6 auto + optional custom)
@@ -256,12 +264,16 @@ Video ────────────┬── VideoTranslation[] (one-per-
 
 | Decision | Reasoning |
 |----------|-----------|
-| `keycloakSub` as the user identity bridge | The API creates a local `User` record on first `/me` call, linked by Keycloak's `sub` claim. This decouples application data from the IdP — if Keycloak is replaced, only the identity bridge column changes. |
+| `externalId` (Clerk `sub`) as the user identity bridge | The API creates a local `User` record on first `/me` call, linked by Clerk's `sub` claim. Application data stays decoupled from the IdP. |
 | Many-to-many for channels and tags | Videos can belong to multiple channels and have multiple tags. Join tables (`VideoChannel`, `VideoTag`) with composite primary keys avoid duplicate entries and support efficient index-based queries. |
 | Separate `UploadIntent` model | Tracks each upload attempt independently. A single video can have multiple intents (failed uploads, retries). The intent stores `objectKey`, `bucket`, `sizeBytes`, and `status`, enabling resume-by-ID and size verification on completion. |
 | `VideoAsset` as a single record per video | Stores both the original file pointer and the HLS master playlist pointer. This is a 1:1 relationship because a video has exactly one source file and one set of HLS outputs at a time. Reprocessing overwrites the HLS pointers. |
 | `ThumbnailSource` enum (AUTO vs CUSTOM) | When a creator uploads a custom thumbnail, auto-generated thumbnails are preserved. Reprocessing only deletes `AUTO` thumbnails, preserving the custom selection. |
 | `ProcessingJob` with `correlationId` | Links the job back to the originating API request via the `x-request-id`, enabling end-to-end tracing. `attempts` and `lastError` support retry visibility in the admin jobs dashboard. |
+| `primaryChannelId` alongside the many-to-many `VideoChannel` | A video can sit in several channels, so "which category is this video in?" has no single answer without a designated channel. The primary channel supplies a deterministic breadcrumb and category filter while multi-channel membership is preserved. |
+| Category and Subcategory are not columns on `Video` | They resolve through `primaryChannelId → Channel.subcategoryId → Subcategory.categoryId`. Re-parenting a channel reclassifies its content automatically, and the three levels cannot drift out of agreement. |
+| `Tag.normalizedName` unique, with `TagAlias` and `mergedIntoTagId` | Contributors create tags freely, so canonical identity has to be computed (trim, strip `#`, NFKC, collapse, lowercase) rather than trusted. Merging tombstones the loser and keeps an alias, so `/tags/{slug}` links shared before the merge still resolve. |
+| `Channel.subcategoryId` nullable in the database, required by the admin API | A `NOT NULL` constraint would have failed on channels that predate the hierarchy. Unmapped channels surface in an admin bucket instead. |
 
 ---
 
@@ -280,6 +292,7 @@ The API uses a **role-prefixed route structure**:
 | `/uploads/*` | JWT (any role) | Content creators | `POST /uploads/init` |
 | `/admin/*` | JWT + ADMIN/MODERATOR | Platform operators | `GET /admin/moderation/queue` |
 | `/channels`, `/tags` | JWT (any role) | Creator forms | `GET /channels` |
+| `/categories` | No | Anonymous viewers | `GET /categories/leadership-speeches` |
 
 **Reasoning**: This prefix convention makes it immediately clear from the URL what authentication level is required and who the intended consumer is. It also allows future API gateway rules to be applied by prefix (e.g., rate-limit `/public/*` differently from `/admin/*`).
 
@@ -298,16 +311,16 @@ The API has ~25 controllers, each handling a narrow slice of functionality (e.g.
 ### 6.1 Authentication Flow
 
 ```
-Browser ──► Keycloak Login ──► JWT issued (RS256, realm roles in claims)
+Browser ──► Clerk Sign-in ──► JWT issued (RS256, roles from publicMetadata)
    │
    ▼
 Browser ──► API Request (Authorization: Bearer <JWT>)
    │
    ▼
-JwtGuard ──► Fetch JWKS from Keycloak (cached) ──► Verify signature + issuer + audience
+JwtGuard ──► Fetch JWKS from Clerk (cached) ──► Verify signature + issuer + audience
    │
    ▼
-RolesGuard ──► Read realm_access.roles from JWT payload ──► Match against @Roles() decorator
+RolesGuard ──► Read roles claim from JWT payload ──► Match against @Roles() decorator
 ```
 
 ### 6.2 Upload Security
@@ -387,8 +400,9 @@ The extraction path is clear: each module already has its own service class, con
 ```
 docker-compose.yml
 ├── postgres:15 (port 5432)
-├── redis:7 (port 6379)
-└── keycloak:24 (port 8080)
+└── redis:7 (port 6379)
+
+Auth: Clerk (cloud) — see docs/clerk-setup.md
 
 pnpm dev (concurrently)
 ├── web: Next.js on :3000
@@ -407,7 +421,7 @@ pnpm dev (concurrently)
 | Cache | Memorystore (Redis) | Managed Redis for session/cache, no ops overhead |
 | Object Storage | Cloud Storage (3 buckets) | Originals (private), renditions (CDN), thumbnails (CDN) |
 | CDN | Cloud CDN + HTTPS LB | Global edge caching for HLS segments and thumbnails |
-| Auth | Keycloak on GCE/GKE | Self-hosted for data sovereignty and customization |
+| Auth | Clerk (managed) | JWT/JWKS for API; invite-only stakeholder onboarding |
 | Events | Cloud Pub/Sub | Managed message queue with guaranteed delivery and DLQ |
 | Secrets | Secret Manager | No secrets in environment variables or code |
 | Monitoring | Cloud Logging + Monitoring | Structured log ingestion, alerting on error rates |
@@ -420,8 +434,8 @@ pnpm dev (concurrently)
 
 | Day | Feature | Key Deliverables |
 |-----|---------|-----------------|
-| 1 | Repo & App Shells | pnpm monorepo, Next.js/NestJS/Worker scaffolds, Docker Compose (Postgres + Redis + Keycloak), `pnpm dev` boots all services |
-| 2 | Auth & RBAC | Keycloak realm + social login placeholders, JWT validation via JWKS (`jose`), `@Roles()` decorator + `RolesGuard`, `GET /me` user sync, role-gated UI areas |
+| 1 | Repo & App Shells | pnpm monorepo, Next.js/NestJS/Worker scaffolds, Docker Compose (Postgres + Redis), `pnpm dev` boots all services |
+| 2 | Auth & RBAC | Clerk + JWT template, JWT validation via JWKS (`jose`), `@Roles()` decorator + `RolesGuard`, `GET /me` user sync, role-gated UI areas |
 | 3 | Database Baseline | Prisma schema with core entities (`User`, `UserRole`, `CreatorProfile`, `Channel`, `Tag`), migration pipeline, translation tables for i18n, seed data |
 | 4 | GCP Infra Blueprint | Environment plan (dev/staging/prod), GCS bucket layout, Pub/Sub topics, Cloud Run targets, Secret Manager strategy |
 
@@ -456,11 +470,24 @@ Premium features: drafts, bulk upload, thumbnail picker, visibility modes, sched
 | 20 | Video Analytics | Dual-layer model: `VideoAnalyticsEvent` (raw) + `VideoAnalyticsDaily` (aggregated), `POST /analytics/videos/:id/events` (public, no auth), event types (IMPRESSION/PLAY_START/HEARTBEAT/PLAY_COMPLETE), traffic source attribution (DIRECT/SHARE/CHANNEL/TAG/SEARCH/EXTERNAL), unique viewer detection (SHA-256 hash), completion deduplication (per session/day), denormalized counters on Video record, `PublicVideoPlayer` component with milestone-based instrumentation, `GET /creator/videos/:id/analytics` per-video dashboard |
 | 21 | Creator Analytics Overview | `GET /creator/analytics/overview?days=7\|30`, aggregated metrics across all creator videos, totals (views/unique viewers/play starts/completions/completion rate), traffic source breakdown, daily trend series, top 5 videos with thumbnails, locale-aware title fallback, dashboard UI with summary cards + trend list |
 
-### Phase 3 — Power Backoffice + Discovery (Day 22+, In Progress)
+### Phase 3 — Distribution + Governance (Days 22–27) ✅
 
 | Day | Feature | Key Deliverables |
 |-----|---------|-----------------|
-| 22 | Tag Landing Pages | `GET /tags/:slug` public endpoint, locale-aware tag metadata with description field (new `TagTranslation.description`), paginated video grid (only `PUBLISHED + PUBLIC`), uploader privacy respected, empty state vs 404 distinction, SEO metadata, video links include `?src=tag` for analytics attribution, responsive grid (2/3/4 columns) |
+| 22 | Tag Landing Pages | `GET /tags/:slug`, locale-aware metadata + description, paginated `PUBLISHED + PUBLIC` grid, SEO, `?src=tag` analytics |
+| 23 | Short Share Links | `ShortLink` model, `POST /creator/videos/:id/share`, `GET /short-links/:code`, web `/s/{code}` redirect with `?src=share` |
+| 24 | Embed Player | `GET /public/videos/:slug/embed`, `/[locale]/embed/[slug]` iframe player, `EXTERNAL` analytics, copy-embed UI, CSP for framing |
+| 25 | Moderation Improvements | Structured rejection (`rejectionReason`, `rejectionNote`, timestamps), creator rejection panel, admin queue context |
+| 26 | Resubmission Flow | `POST /creator/videos/:id/resubmit`, `moderationVersion`, creator resubmit button, admin revision badges |
+| 27 | Content Governance | Takedown / archive / restore, `VideoAuditLog`, governance fields, admin + creator UI, public exclusion of governed content |
+
+### Beyond the day plan ✅
+
+| Feature | Key Deliverables |
+|---------|-----------------|
+| Subtitles | `VideoSubtitle` model, creator upload `.vtt`/`.srt` per locale, player CC |
+| Media items | `MediaItem` for `IMAGE` / `DOCUMENT`, parallel upload/moderation/governance at `/upload/media` |
+| Taxonomy & tag governance | `Category` / `Subcategory` (+ translations), `Channel.subcategoryId`, `primaryChannelId` on `Video` and `MediaItem`, governed tags with `TagAlias` + merge/block, `/admin/taxonomy` and `/admin/tags` consoles, `/categories` browse routes, `TaxonomyAuditLog` |
 
 ---
 
@@ -468,17 +495,11 @@ Premium features: drafts, bulk upload, thumbnail picker, visibility modes, sched
 
 | Metric | Count |
 |--------|-------|
-| Development days completed | 22 |
-| API controllers | ~25 |
-| API endpoints | ~60 |
-| Prisma models | 16 |
-| PostgreSQL enums | 8 |
-| Frontend pages/routes | 18 |
-| Frontend components | ~20 |
+| Development days completed | 27 (+ Day 2.5 i18n) |
+| API modules | auth, videos, uploads, admin, public, channels, taxonomy, tags, search, short-links, media, analytics |
+| Prisma models | 25+ (including taxonomy hierarchy, governance, subtitles, media, short links) |
 | Supported locales | 3 (en, si, ta) |
 | Video lifecycle states | 11 |
-| Analytics event types | 4 |
-| Traffic source types | 7 |
 | HLS renditions | 2 (360p, 720p) |
 | Auto-generated thumbnails per video | 6 |
 
@@ -489,7 +510,7 @@ Premium features: drafts, bulk upload, thumbnail picker, visibility modes, sched
 | Trade-off | Decision | Justification |
 |-----------|----------|---------------|
 | **Monolith vs Microservices** | Modular monolith | Team size doesn't warrant distributed systems overhead. Module boundaries enable future extraction. |
-| **Self-hosted auth vs managed** | Keycloak (self-hosted) | Full control over user data, no per-MAU costs, social login brokering built-in. |
+| **Self-hosted auth vs managed** | Clerk (managed) | Faster onboarding, no IdP ops; roles in publicMetadata; JWKS validation unchanged |
 | **Direct GCS upload vs API proxy** | Direct-to-GCS with signed URLs | Eliminates API as a bandwidth bottleneck. Enables multi-GB uploads without server memory pressure. |
 | **Pub/Sub vs direct worker call** | Asynchronous via Pub/Sub | Decouples upload completion from processing. Enables retry semantics, DLQ, and independent scaling. |
 | **Prisma vs raw SQL** | Prisma ORM | Type safety, auto-generated client, migration management. Accepted trade-off: less control over complex queries. |
@@ -508,34 +529,36 @@ Premium features: drafts, bulk upload, thumbnail picker, visibility modes, sched
 
 | Domain | Capability | Phase |
 |--------|-----------|-------|
-| **Auth & Identity** | Keycloak SSO, JWT/JWKS validation, RBAC guards, social login brokering, user sync | 0 |
-| **Upload Pipeline** | Direct-to-GCS resumable uploads, pause/resume, role-based size/quota limits, bulk upload manager (parallel queue), upload intent tracking | 0-2 |
+| **Auth & Identity** | Clerk SSO, JWT/JWKS validation, RBAC guards, invite-only sign-up, creator approval sync | 0 |
+| **Upload Pipeline** | Direct-to-GCS resumable uploads, pause/resume, role-based size/quota limits, bulk upload manager, upload intent tracking | 0-2 |
 | **Video Processing** | FFmpeg worker via Pub/Sub, ffprobe metadata, 6 auto-thumbnails, HLS transcode (360p+720p), idempotent job processing, job failure tracking | 1 |
-| **Content Moderation** | 11-state lifecycle FSM, dual approval (creator + content), moderation queue, approve/reject/publish, admin backoffice | 1 |
-| **Social Sharing** | SSR share pages with OG/Twitter metadata, social share buttons (WhatsApp/FB/X/LinkedIn), copy helpers, locale-aware URLs | 1 |
-| **Taxonomy** | Channels + Tags CRUD with i18n translations, many-to-many video associations, admin management, locale fallback chain | 1 |
-| **Creator Workflow** | Multi-locale draft editor, thumbnail picker + custom upload, visibility modes (PUBLIC/UNLISTED/PRIVATE), scheduled publishing | 2 |
-| **Discovery** | Channel landing pages, tag landing pages, keyword search + channel/tag filters, paginated video grids, SEO metadata | 2-3 |
-| **Analytics** | Raw event capture + daily aggregation, traffic source attribution, unique viewer detection, completion tracking, per-video + creator overview dashboards | 2 |
+| **Content Moderation** | 11-state lifecycle FSM, dual approval (creator + content), moderation queue, approve/reject/publish, resubmit with revision tracking, admin backoffice | 1-3 |
+| **Social Sharing** | SSR share pages with OG/Twitter metadata, social share buttons, short links, embed player, copy helpers, locale-aware URLs | 1-3 |
+| **Taxonomy** | Category → Subcategory → Channel hierarchy with i18n translations, primary-channel classification and breadcrumbs, admin drill-down console with impact preview and unmapped bucket, channel + tag landing pages, `/categories` browse routes | 1-3, post-27 |
+| **Tag governance** | Contributor tag creation with canonical normalization, `PENDING` tags for unapproved creators, merge with alias-preserving slugs, block/feature, per-item tag ceiling, `TaxonomyAuditLog` | post-27 |
+| **Creator Workflow** | Multi-locale draft editor, thumbnail picker + custom upload, visibility modes, scheduled publishing, subtitles | 2+ |
+| **Discovery** | Keyword search + category/subcategory/channel/tag filters, paginated video grids, SEO metadata | 2-3 |
+| **Analytics** | Raw event capture + daily aggregation, traffic source attribution, per-video + creator overview dashboards, embed `EXTERNAL` source | 2-3 |
+| **Governance** | Takedown / archive / restore, `VideoAuditLog`, governance reasons on video records | 3 |
+| **Media items** | IMAGE/DOCUMENT upload path with parallel moderation and governance | post-27 |
 | **Observability** | Correlation ID propagation (API → Pub/Sub → Worker), structured logging, processing job ledger, admin jobs dashboard | 1 |
-| **Internationalization** | 3 locales (en/si/ta), translation tables for all content, locale-aware API responses, next-intl middleware, per-locale message bundles | 0 |
+| **Internationalization** | 3 locales (en/si/ta), translation tables, locale-aware API responses, next-intl middleware | 0 |
 
-### Remaining (Phase 3-4 Roadmap)
+### Remaining (Phase 4 Roadmap)
 
 | Feature | Priority | Architecture Impact |
 |---------|----------|---------------------|
-| Audit logging | High | New `audit_logs` table, decorator-based event capture on privileged actions (role changes, approvals, deletions, takedowns) |
-| User management (suspend/disable/quotas) | High | Admin UI for user lifecycle, quota overrides, internal notes |
-| Reports & abuse flow | High | New `reports` table, report video/user workflow, escalation status tracking |
-| Reprocess / retry / DLQ viewer | Medium | Admin "replay" button for failed jobs, dead-letter queue consumer, reprocessing trigger |
-| Rate limiting (production) | Medium | Redis-backed sliding window (`Memorystore`), per-endpoint and per-user throttle |
-| DMCA/takedown case management | Medium | New `takedowns` table, status transitions, counter-notice workflow |
-| Embeddable player (iframe) | Low | Separate lightweight player bundle, domain allowlist configuration |
-| Full-text search with facets | Low | PostgreSQL `tsvector` indexes or migration to Elasticsearch/Meilisearch |
-| Auto-captions (speech-to-text) | Future | Cloud Speech-to-Text API integration, new worker job type, `captions` table |
-| Watch history / Continue watching | Future | New `watch_history` table, per-user position state |
-| Related/trending videos | Future | Tag/channel similarity scoring, time-windowed view aggregation |
-| Geographic/device analytics | Future | IP geolocation service, user-agent parsing, new aggregation dimensions |
+| User management (suspend/disable/quotas UI) | High | Admin UI for user lifecycle, quota overrides, internal notes |
+| Reports & abuse flow | High | New `reports` table, report video/user workflow |
+| Reprocess / retry / DLQ viewer (enhanced) | Medium | Admin replay for failed jobs; DLQ consumer |
+| Rate limiting (production) | Medium | Redis-backed sliding window (`Memorystore`) |
+| Embed domain allowlist | Low | Configurable iframe referrer policy |
+| Full-text search with facets | Low | PostgreSQL `tsvector` or Elasticsearch/Meilisearch |
+| Auto-captions (speech-to-text) | Future | Cloud Speech-to-Text, new worker job type |
+| Watch history / Continue watching | Future | `watch_history` table |
+| Related/trending videos | Future | Tag/channel similarity, time-windowed views |
+| External link ingest (YouTube/Vimeo) | Future | External record + optional import |
+| DMCA case management (full workflow) | Future | Case records beyond single-video takedown |
 
 ---
 
@@ -565,9 +588,10 @@ Creator opens Upload page
 Admin opens Moderation Queue → GET /admin/moderation/queue
   → Reviews video: metadata, thumbnails, playback
   → Approve → status APPROVED (or PUBLISHED if schedule overdue)
-  → Reject → status REJECTED (creator can edit and resubmit)
-  → If APPROVED + scheduled: ScheduledPublisherService auto-publishes at scheduledAt
-  → If APPROVED + no schedule: Admin manually publishes → status PUBLISHED + visibility applies
+  → Reject → status REJECTED (creator sees reason; can edit and resubmit → PENDING_APPROVAL)
+  → Publish → status PUBLISHED (or ScheduledPublisherService auto-publishes at scheduledAt)
+  → Takedown / Archive published content → TAKEDOWN / ARCHIVED (audit log entry)
+  → Restore governed content → PUBLISHED
 ```
 
 ### Flow 3: Viewer Discovers and Watches

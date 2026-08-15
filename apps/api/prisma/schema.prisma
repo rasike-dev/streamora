@@ -87,6 +87,32 @@ enum UploadTargetKind {
   MEDIA
 }
 
+enum TagStatus {
+  ACTIVE
+  PENDING
+  BLOCKED
+  MERGED
+}
+
+enum TaxonomyEntityType {
+  CATEGORY
+  SUBCATEGORY
+  CHANNEL
+  TAG
+}
+
+enum TaxonomyAuditAction {
+  TAXONOMY_CREATED
+  TAXONOMY_UPDATED
+  TAXONOMY_ARCHIVED
+  TAXONOMY_RESTORED
+  TAXONOMY_MOVED
+  TAXONOMY_REORDERED
+  TAG_MERGED
+  TAG_STATUS_CHANGED
+  TAG_ALIAS_ADDED
+}
+
 enum MediaAuditAction {
   MEDIA_CREATED
   MEDIA_SUBMITTED
@@ -100,20 +126,20 @@ enum MediaAuditAction {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  externalId    String   @unique
-  email         String?
-  username      String?
-  displayName   String?
-  status        UserStatus @default(ACTIVE)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String     @id @default(cuid())
+  externalId  String     @unique
+  email       String?
+  username    String?
+  displayName String?
+  status      UserStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  roles         UserRole[]
-  creatorProfile CreatorProfile?
-  videos        Video[] @relation("UploaderVideos")
-  mediaItems    MediaItem[] @relation("UploaderMedia")
-  shortLinks    ShortLink[]
+  roles           UserRole[]
+  creatorProfile  CreatorProfile?
+  videos          Video[]          @relation("UploaderVideos")
+  mediaItems      MediaItem[]      @relation("UploaderMedia")
+  shortLinks      ShortLink[]
   mediaShortLinks MediaShortLink[]
 
   @@index([externalId])
@@ -132,39 +158,113 @@ model UserRole {
 }
 
 model CreatorProfile {
-  id            String @id @default(cuid())
-  userId        String @unique
-  approval      CreatorApprovalStatus @default(PENDING)
-  notes         String?
+  id                      String                @id @default(cuid())
+  userId                  String                @unique
+  approval                CreatorApprovalStatus @default(PENDING)
+  notes                   String?
   dailyUploadLimitMinutes Int? // optional quota
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model Channel {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Category {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  description  String?
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  videos    VideoChannel[]
-  mediaItems MediaItemChannel[]
-  translations ChannelTranslation[]
+  subcategories Subcategory[]
+  translations  CategoryTranslation[]
 
   @@index([slug])
   @@index([isActive])
+  @@index([displayOrder])
+}
+
+model CategoryTranslation {
+  id          String  @id @default(cuid())
+  categoryId  String
+  locale      String // en | si | ta
+  name        String
+  description String?
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, locale])
+  @@index([locale])
+}
+
+model Subcategory {
+  id           String   @id @default(cuid())
+  categoryId   String
+  name         String
+  slug         String
+  description  String?
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category     Category                 @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  channels     Channel[]
+  translations SubcategoryTranslation[]
+
+  @@unique([categoryId, slug])
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([displayOrder])
+}
+
+model SubcategoryTranslation {
+  id            String  @id @default(cuid())
+  subcategoryId String
+  locale        String // en | si | ta
+  name          String
+  description   String?
+
+  subcategory Subcategory @relation(fields: [subcategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([subcategoryId, locale])
+  @@index([locale])
+}
+
+model Channel {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  subcategoryId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subcategory       Subcategory?         @relation(fields: [subcategoryId], references: [id], onDelete: Restrict)
+  videos            VideoChannel[]
+  mediaItems        MediaItemChannel[]
+  translations      ChannelTranslation[]
+  primaryVideos     Video[]              @relation("PrimaryChannelVideos")
+  primaryMediaItems MediaItem[]          @relation("PrimaryChannelMedia")
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([subcategoryId])
 }
 
 model ChannelTranslation {
-  id        String @id @default(cuid())
-  channelId String
-  locale    String // en | si | ta
-  name      String
+  id          String  @id @default(cuid())
+  channelId   String
+  locale      String // en | si | ta
+  name        String
   description String?
 
   channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -174,22 +274,45 @@ model ChannelTranslation {
 }
 
 model Tag {
-  id         String   @id @default(cuid())
-  name       String
-  slug       String   @unique
-  preferred  Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String    @id @default(cuid())
+  name            String
+  slug            String    @unique
+  // Canonical comparison key (lower-cased, unicode-normalized, '#' stripped).
+  // Nullable so the expand/backfill/enforce migration sequence can never fail a deploy.
+  normalizedName  String?   @unique
+  status          TagStatus @default(ACTIVE)
+  preferred       Boolean   @default(false)
+  createdById     String?
+  mergedIntoTagId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  videos     VideoTag[]
-  mediaItems MediaItemTag[]
+  videos       VideoTag[]
+  mediaItems   MediaItemTag[]
   translations TagTranslation[]
+  aliases      TagAlias[]
+  mergedInto   Tag?             @relation("TagMerge", fields: [mergedIntoTagId], references: [id], onDelete: SetNull)
+  mergedFrom   Tag[]            @relation("TagMerge")
 
   @@index([slug])
+  @@index([status])
+}
+
+model TagAlias {
+  id              String   @id @default(cuid())
+  tagId           String
+  alias           String
+  normalizedAlias String   @unique
+  createdBy       String?
+  createdAt       DateTime @default(now())
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@index([tagId])
 }
 
 model TagTranslation {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   tagId       String
   locale      String
   name        String
@@ -202,53 +325,57 @@ model TagTranslation {
 }
 
 model Video {
-  id              String    @id @default(cuid())
-  slug            String    @unique
-  status          VideoStatus @default(DRAFT)
-  visibility      VideoVisibility @default(PRIVATE)
-  publishAt       DateTime?
-  scheduledAt     DateTime?
-  publishedAt     DateTime?
-  scheduleRequested Boolean @default(false)
-  uploaderId      String?
-  uploaderVisible Boolean   @default(false) // stays false until creator approved (your rule)
-  
+  id                String          @id @default(cuid())
+  slug              String          @unique
+  status            VideoStatus     @default(DRAFT)
+  visibility        VideoVisibility @default(PRIVATE)
+  publishAt         DateTime?
+  scheduledAt       DateTime?
+  publishedAt       DateTime?
+  scheduleRequested Boolean         @default(false)
+  uploaderId        String?
+  uploaderVisible   Boolean         @default(false) // stays false until creator approved (your rule)
+  // Deterministic classification: Category/Subcategory are derived through this channel.
+  // Must always be one of the channels linked via VideoChannel.
+  primaryChannelId  String?
+
   // Moderation fields
-  rejectionReason String?
-  rejectionNote   String?
-  rejectedAt      DateTime?
-  rejectedBy      String?
-  resubmittedAt   DateTime?
-  moderationVersion Int      @default(1)
-  
+  rejectionReason   String?
+  rejectionNote     String?
+  rejectedAt        DateTime?
+  rejectedBy        String?
+  resubmittedAt     DateTime?
+  moderationVersion Int       @default(1)
+
   // Governance fields
-  takedownReason  String?
-  takedownNote    String?
-  takenDownAt     DateTime?
-  takenDownBy     String?
-  archivedReason  String?
-  archivedNote    String?
-  archivedAt      DateTime?
-  archivedBy      String?
-  
+  takedownReason String?
+  takedownNote   String?
+  takenDownAt    DateTime?
+  takenDownBy    String?
+  archivedReason String?
+  archivedNote   String?
+  archivedAt     DateTime?
+  archivedBy     String?
+
   // Analytics denormalized fields
-  analyticsViews      Int       @default(0)
-  analyticsCompletions Int      @default(0)
+  analyticsViews        Int       @default(0)
+  analyticsCompletions  Int       @default(0)
   analyticsLastViewedAt DateTime?
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  uploader   User? @relation("UploaderVideos", fields: [uploaderId], references: [id], onDelete: SetNull)
+  uploader       User?    @relation("UploaderVideos", fields: [uploaderId], references: [id], onDelete: SetNull)
+  primaryChannel Channel? @relation("PrimaryChannelVideos", fields: [primaryChannelId], references: [id], onDelete: SetNull)
 
-  translations VideoTranslation[]
-  channels     VideoChannel[]
-  tags         VideoTag[]
-  uploadIntents UploadIntent[]
-  asset        VideoAsset?
-  thumbnails   VideoThumbnail[]
-  renditions   VideoRendition[]
-  jobs         ProcessingJob[]
+  translations    VideoTranslation[]
+  channels        VideoChannel[]
+  tags            VideoTag[]
+  uploadIntents   UploadIntent[]
+  asset           VideoAsset?
+  thumbnails      VideoThumbnail[]
+  renditions      VideoRendition[]
+  jobs            ProcessingJob[]
   analyticsEvents VideoAnalyticsEvent[]
   analyticsDaily  VideoAnalyticsDaily[]
   shortLinks      ShortLink[]
@@ -259,10 +386,11 @@ model Video {
   @@index([visibility])
   @@index([publishAt])
   @@index([uploaderId])
+  @@index([primaryChannelId])
 }
 
 model VideoTranslation {
-  id          String @id @default(cuid())
+  id          String  @id @default(cuid())
   videoId     String
   locale      String // en | si | ta
   title       String?
@@ -274,6 +402,12 @@ model VideoTranslation {
 
   @@unique([videoId, locale])
   @@index([locale])
+  // Trigram indexes backing SearchService's similarity() ranking.
+  // Declared here (not in a loose .sql file) so `migrate deploy` provisions them
+  // on a fresh database and schema diffs never propose dropping them.
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([tagline(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model VideoChannel {
@@ -288,8 +422,10 @@ model VideoChannel {
 }
 
 model VideoTag {
-  videoId String
-  tagId   String
+  videoId   String
+  tagId     String
+  addedById String?
+  createdAt DateTime @default(now())
 
   video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
   tag   Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
@@ -299,25 +435,25 @@ model VideoTag {
 }
 
 model UploadIntent {
-  id          String       @id @default(cuid())
-  targetKind  UploadTargetKind @default(VIDEO)
-  videoId     String?
-  mediaItemId String?
-  objectKey   String
-  bucket      String
-  contentType String
-  sizeBytes   BigInt
+  id               String           @id @default(cuid())
+  targetKind       UploadTargetKind @default(VIDEO)
+  videoId          String?
+  mediaItemId      String?
+  objectKey        String
+  bucket           String
+  contentType      String
+  sizeBytes        BigInt
   originalFilename String?
-  status      UploadStatus @default(INITIATED)
+  status           UploadStatus     @default(INITIATED)
 
   // Progress tracking
-  uploadedBytes BigInt     @default(0)
+  uploadedBytes BigInt    @default(0)
   lastError     String?
   startedAt     DateTime?
   completedAt   DateTime?
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   video     Video?     @relation(fields: [videoId], references: [id], onDelete: Cascade)
   mediaItem MediaItem? @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
@@ -329,19 +465,19 @@ model UploadIntent {
 }
 
 model VideoAsset {
-  id          String   @id @default(cuid())
-  videoId     String   @unique
-  bucket      String
-  originalKey String
-  contentType String
-  sizeBytes   BigInt
-  durationSec Float?   // filled later by ffprobe
-  width       Int?
-  height      Int?
+  id           String   @id @default(cuid())
+  videoId      String   @unique
+  bucket       String
+  originalKey  String
+  contentType  String
+  sizeBytes    BigInt
+  durationSec  Float? // filled later by ffprobe
+  width        Int?
+  height       Int?
   hlsBucket    String?
-  hlsMasterKey String?  // e.g. renditions/{videoId}/master.m3u8
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  hlsMasterKey String? // e.g. renditions/{videoId}/master.m3u8
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
@@ -354,16 +490,16 @@ enum ThumbnailSource {
 }
 
 model VideoThumbnail {
-  id          String           @id @default(cuid())
-  videoId     String
-  bucket      String
-  objectKey   String
-  width       Int?
-  height      Int?
-  timeSec     Float?          // timestamp used for the frame
-  isSelected  Boolean          @default(false)
-  source      ThumbnailSource  @default(AUTO)
-  createdAt   DateTime         @default(now())
+  id         String          @id @default(cuid())
+  videoId    String
+  bucket     String
+  objectKey  String
+  width      Int?
+  height     Int?
+  timeSec    Float? // timestamp used for the frame
+  isSelected Boolean         @default(false)
+  source     ThumbnailSource @default(AUTO)
+  createdAt  DateTime        @default(now())
 
   video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
@@ -373,21 +509,21 @@ model VideoThumbnail {
 }
 
 model VideoRendition {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   videoId     String
-  quality     String   // "360p" | "720p" etc.
-  playlistKey String   // path to variant playlist (or master for quality)
+  quality     String // "360p" | "720p" etc.
+  playlistKey String // path to variant playlist (or master for quality)
   bandwidth   Int?
   width       Int?
   height      Int?
   codec       String?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
-  @@index([videoId])
   @@unique([videoId, quality])
+  @@index([videoId])
 }
 
 enum JobStatus {
@@ -398,19 +534,19 @@ enum JobStatus {
 }
 
 model ProcessingJob {
-  id            String    @id @default(cuid())
-  videoId       String?
-  mediaItemId   String?
+  id             String    @id @default(cuid())
+  videoId        String?
+  mediaItemId    String?
   uploadIntentId String?
-  jobType       String    // "THUMBS_HLS" | "IMAGE_DERIVATIVES" | "DOC_THUMBNAIL"
-  status        JobStatus @default(PENDING)
-  attempts      Int       @default(0)
-  lastError     String?
-  correlationId String?
-  startedAt     DateTime?
-  completedAt   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  jobType        String // "THUMBS_HLS" | "IMAGE_DERIVATIVES" | "DOC_THUMBNAIL"
+  status         JobStatus @default(PENDING)
+  attempts       Int       @default(0)
+  lastError      String?
+  correlationId  String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   video     Video?     @relation(fields: [videoId], references: [id], onDelete: Cascade)
   mediaItem MediaItem? @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
@@ -421,26 +557,26 @@ model ProcessingJob {
 }
 
 model VideoAnalyticsEvent {
-  id             String                   @id @default(cuid())
-  videoId         String
-  eventType       VideoAnalyticsEventType
-  trafficSource   VideoTrafficSource      @default(UNKNOWN)
+  id            String                  @id @default(cuid())
+  videoId       String
+  eventType     VideoAnalyticsEventType
+  trafficSource VideoTrafficSource      @default(UNKNOWN)
 
-  sessionId       String
-  viewerHash      String?
-  locale          String?
+  sessionId  String
+  viewerHash String?
+  locale     String?
 
   progressPercent Float?
   positionSeconds Float?
   durationSeconds Float?
 
-  referrerHost    String?
-  userAgent       String?
-  ipHash          String?
+  referrerHost String?
+  userAgent    String?
+  ipHash       String?
 
-  createdAt       DateTime                @default(now())
+  createdAt DateTime @default(now())
 
-  video           Video                   @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@index([videoId, createdAt])
   @@index([videoId, eventType, createdAt])
@@ -448,26 +584,26 @@ model VideoAnalyticsEvent {
 }
 
 model VideoAnalyticsDaily {
-  id               String              @id @default(cuid())
-  videoId           String
-  date              DateTime
+  id      String   @id @default(cuid())
+  videoId String
+  date    DateTime
 
-  views             Int                 @default(0)
-  uniqueViewers     Int                 @default(0)
-  playStarts        Int                 @default(0)
-  completions       Int                 @default(0)
+  views         Int @default(0)
+  uniqueViewers Int @default(0)
+  playStarts    Int @default(0)
+  completions   Int @default(0)
 
-  directViews       Int                 @default(0)
-  shareViews        Int                 @default(0)
-  channelViews      Int                 @default(0)
-  tagViews          Int                 @default(0)
-  searchViews       Int                 @default(0)
-  externalViews     Int                 @default(0)
-  unknownViews      Int                 @default(0)
+  directViews   Int @default(0)
+  shareViews    Int @default(0)
+  channelViews  Int @default(0)
+  tagViews      Int @default(0)
+  searchViews   Int @default(0)
+  externalViews Int @default(0)
+  unknownViews  Int @default(0)
 
-  lastViewedAt      DateTime?
+  lastViewedAt DateTime?
 
-  video             Video               @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@unique([videoId, date])
   @@index([videoId, date])
@@ -481,8 +617,8 @@ model ShortLink {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  video           Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  createdByUser   User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  video         Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  createdByUser User? @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@index([videoId])
   @@index([code])
@@ -508,7 +644,7 @@ model VideoAuditLog {
   metadata    Json?
   createdAt   DateTime         @default(now())
 
-  video       Video            @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@index([videoId, createdAt])
   @@index([action, createdAt])
@@ -520,58 +656,62 @@ enum SubtitleFormat {
 }
 
 model MediaItem {
-  id              String          @id @default(cuid())
-  slug            String          @unique
-  kind            MediaKind
-  status          MediaStatus     @default(DRAFT)
-  visibility      VideoVisibility @default(PRIVATE)
-  scheduledAt     DateTime?
-  publishedAt     DateTime?
+  id                String          @id @default(cuid())
+  slug              String          @unique
+  kind              MediaKind
+  status            MediaStatus     @default(DRAFT)
+  visibility        VideoVisibility @default(PRIVATE)
+  scheduledAt       DateTime?
+  publishedAt       DateTime?
   scheduleRequested Boolean         @default(false)
-  uploaderId      String?
-  uploaderVisible Boolean         @default(false)
+  uploaderId        String?
+  uploaderVisible   Boolean         @default(false)
+  // Deterministic classification, mirrors Video.primaryChannelId.
+  primaryChannelId  String?
 
-  rejectionReason String?
-  rejectionNote   String?
-  rejectedAt      DateTime?
-  rejectedBy      String?
-  resubmittedAt   DateTime?
-  moderationVersion Int           @default(1)
+  rejectionReason   String?
+  rejectionNote     String?
+  rejectedAt        DateTime?
+  rejectedBy        String?
+  resubmittedAt     DateTime?
+  moderationVersion Int       @default(1)
 
-  takedownReason  String?
-  takedownNote    String?
-  takenDownAt     DateTime?
-  takenDownBy     String?
-  archivedReason  String?
-  archivedNote    String?
-  archivedAt      DateTime?
-  archivedBy      String?
+  takedownReason String?
+  takedownNote   String?
+  takenDownAt    DateTime?
+  takenDownBy    String?
+  archivedReason String?
+  archivedNote   String?
+  archivedAt     DateTime?
+  archivedBy     String?
 
-  views           Int             @default(0)
-  downloads       Int             @default(0)
-  lastViewedAt    DateTime?
+  views        Int       @default(0)
+  downloads    Int       @default(0)
+  lastViewedAt DateTime?
 
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  uploader        User?           @relation("UploaderMedia", fields: [uploaderId], references: [id], onDelete: SetNull)
-  translations    MediaItemTranslation[]
-  channels        MediaItemChannel[]
-  tags            MediaItemTag[]
-  uploadIntents   UploadIntent[]
-  asset           MediaAsset?
-  jobs            ProcessingJob[]
-  shortLinks      MediaShortLink[]
-  auditLogs       MediaAuditLog[]
+  uploader       User?                  @relation("UploaderMedia", fields: [uploaderId], references: [id], onDelete: SetNull)
+  primaryChannel Channel?               @relation("PrimaryChannelMedia", fields: [primaryChannelId], references: [id], onDelete: SetNull)
+  translations   MediaItemTranslation[]
+  channels       MediaItemChannel[]
+  tags           MediaItemTag[]
+  uploadIntents  UploadIntent[]
+  asset          MediaAsset?
+  jobs           ProcessingJob[]
+  shortLinks     MediaShortLink[]
+  auditLogs      MediaAuditLog[]
 
   @@index([status])
   @@index([visibility])
   @@index([kind])
   @@index([uploaderId])
+  @@index([primaryChannelId])
 }
 
 model MediaItemTranslation {
-  id          String @id @default(cuid())
+  id          String  @id @default(cuid())
   mediaItemId String
   locale      String
   title       String?
@@ -598,6 +738,8 @@ model MediaItemChannel {
 model MediaItemTag {
   mediaItemId String
   tagId       String
+  addedById   String?
+  createdAt   DateTime @default(now())
 
   mediaItem MediaItem @relation(fields: [mediaItemId], references: [id], onDelete: Cascade)
   tag       Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
@@ -656,17 +798,30 @@ model MediaAuditLog {
   @@index([action, createdAt])
 }
 
-model VideoSubtitle {
-  id         String         @id @default(cuid())
-  videoId    String
-  locale     String
-  format     SubtitleFormat @default(VTT)
-  bucket     String
-  objectKey  String
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+model TaxonomyAuditLog {
+  id          String              @id @default(cuid())
+  entityType  TaxonomyEntityType
+  entityId    String
+  action      TaxonomyAuditAction
+  actorUserId String
+  metadata    Json?
+  createdAt   DateTime            @default(now())
 
-  video      Video         @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  @@index([entityType, entityId, createdAt])
+  @@index([action, createdAt])
+}
+
+model VideoSubtitle {
+  id        String         @id @default(cuid())
+  videoId   String
+  locale    String
+  format    SubtitleFormat @default(VTT)
+  bucket    String
+  objectKey String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@unique([videoId, locale])
   @@index([videoId])

@@ -21,6 +21,8 @@ export class PublicVideosService {
   async listVideos(opts: {
     locale: string;
     q?: string;
+    category?: string;
+    subcategory?: string;
     channel?: string;
     tag?: string;
     page?: number;
@@ -37,6 +39,8 @@ export class PublicVideosService {
       const searchResult = await this.searchService.searchPublicVideos({
         locale,
         q,
+        category: opts.category,
+        subcategory: opts.subcategory,
         channel: opts.channel,
         tag: opts.tag,
         page,
@@ -106,6 +110,8 @@ export class PublicVideosService {
         return {
           filters: {
             q: q ?? '',
+            category: opts.category ?? null,
+            subcategory: opts.subcategory ?? null,
             channel: opts.channel ?? null,
             tag: opts.tag ?? null,
             locale,
@@ -188,14 +194,33 @@ export class PublicVideosService {
       };
     }
 
+    // Channel, subcategory and category all constrain the same relation, so they
+    // are merged into one `some` clause: a single channel must satisfy all of
+    // them rather than one channel matching each filter independently.
+    const channelWhere: any = {};
+
     if (opts.channel) {
+      channelWhere.slug = opts.channel;
+    }
+
+    if (opts.subcategory) {
+      channelWhere.subcategory = {
+        slug: opts.subcategory,
+        isActive: true,
+        ...(opts.category
+          ? { category: { slug: opts.category, isActive: true } }
+          : {}),
+      };
+    } else if (opts.category) {
+      channelWhere.subcategory = {
+        isActive: true,
+        category: { slug: opts.category, isActive: true },
+      };
+    }
+
+    if (Object.keys(channelWhere).length) {
       where.channels = {
-        some: {
-          channel: {
-            slug: opts.channel,
-            isActive: true,
-          },
-        },
+        some: { channel: { ...channelWhere, isActive: true } },
       };
     }
 
@@ -280,6 +305,8 @@ export class PublicVideosService {
     return {
       filters: {
         q: q ?? '',
+        category: opts.category ?? null,
+        subcategory: opts.subcategory ?? null,
         channel: opts.channel ?? null,
         tag: opts.tag ?? null,
         locale,

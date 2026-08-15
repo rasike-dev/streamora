@@ -78,9 +78,7 @@ export class AppController {
     const rolesToAdd = roles.filter(
       (r: string) => !existingRoleNames.includes(r),
     );
-    const rolesToRemove = existingRoleNames.filter(
-      (r) => !roles.includes(r),
-    );
+    const rolesToRemove = existingRoleNames.filter((r) => !roles.includes(r));
 
     if (rolesToAdd.length > 0) {
       await this.prisma.userRole.createMany({

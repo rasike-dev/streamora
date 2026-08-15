@@ -20,10 +20,7 @@ const DOCUMENT_MIME_TYPES = new Set([
   'application/x-zip-compressed',
 ]);
 
-const DISALLOWED_MIME_TYPES = new Set([
-  'image/svg+xml',
-  'image/svg',
-]);
+const DISALLOWED_MIME_TYPES = new Set(['image/svg+xml', 'image/svg']);
 
 export const IMAGE_SIZE_LIMITS = {
   pending: 10 * 1024 * 1024,
@@ -55,9 +52,7 @@ export function safeExt(filename: string): string {
 
 export function getMediaBucket(): string {
   return (
-    process.env.MEDIA_BUCKET ||
-    process.env.GCS_BUCKET ||
-    'streamora-media'
+    process.env.MEDIA_BUCKET || process.env.GCS_BUCKET || 'streamora-media'
   );
 }
 
@@ -68,7 +63,9 @@ export function getMaxBytesForMedia(
   if (kind === 'IMAGE') {
     return isPending ? IMAGE_SIZE_LIMITS.pending : IMAGE_SIZE_LIMITS.approved;
   }
-  return isPending ? DOCUMENT_SIZE_LIMITS.pending : DOCUMENT_SIZE_LIMITS.approved;
+  return isPending
+    ? DOCUMENT_SIZE_LIMITS.pending
+    : DOCUMENT_SIZE_LIMITS.approved;
 }
 
 export function getAllowedMimeTypes(kind: MediaKind): string[] {
@@ -84,8 +81,7 @@ export function assertAllowedContentType(
   if (DISALLOWED_MIME_TYPES.has(normalized)) {
     throw new BadRequestException('SVG uploads are not allowed');
   }
-  const allowed =
-    kind === 'IMAGE' ? IMAGE_MIME_TYPES : DOCUMENT_MIME_TYPES;
+  const allowed = kind === 'IMAGE' ? IMAGE_MIME_TYPES : DOCUMENT_MIME_TYPES;
   if (!allowed.has(normalized)) {
     throw new BadRequestException(
       `Content type not allowed for ${kind}: ${normalized}`,
@@ -109,14 +105,12 @@ export function isPdfContentType(contentType: string): boolean {
 
 export function shouldInlinePreview(contentType: string): boolean {
   const normalized = contentType.split(';')[0].trim().toLowerCase();
-  return (
-    IMAGE_MIME_TYPES.has(normalized) || normalized === 'application/pdf'
-  );
+  return IMAGE_MIME_TYPES.has(normalized) || normalized === 'application/pdf';
 }
 
 export function getContentDisposition(
   contentType: string,
-  filename: string,
+  _filename: string,
 ): 'inline' | 'attachment' {
   return shouldInlinePreview(contentType) ? 'inline' : 'attachment';
 }
@@ -145,8 +139,7 @@ export async function validateUploadedMediaContent(
     throw new BadRequestException('SVG uploads are not allowed');
   }
 
-  const allowed =
-    kind === 'IMAGE' ? IMAGE_MIME_TYPES : DOCUMENT_MIME_TYPES;
+  const allowed = kind === 'IMAGE' ? IMAGE_MIME_TYPES : DOCUMENT_MIME_TYPES;
 
   if (sniffed && !allowed.has(sniffed)) {
     throw new BadRequestException(
@@ -155,7 +148,9 @@ export async function validateUploadedMediaContent(
   }
 
   if (!allowed.has(declared)) {
-    throw new BadRequestException(`Declared content type not allowed: ${declared}`);
+    throw new BadRequestException(
+      `Declared content type not allowed: ${declared}`,
+    );
   }
 
   if (sniffed && sniffed !== declared) {

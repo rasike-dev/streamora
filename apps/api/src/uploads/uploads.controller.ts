@@ -6,7 +6,6 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
-import { MediaKind } from '@prisma/client';
 import { getRolesFromRequest } from '../auth/auth-user.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtGuard } from '../auth/jwt.guard';
@@ -51,7 +50,9 @@ export class UploadsController {
       );
     }
     if (videoId && mediaItemId) {
-      throw new BadRequestException('Provide either videoId or mediaItemId, not both');
+      throw new BadRequestException(
+        'Provide either videoId or mediaItemId, not both',
+      );
     }
 
     const userSub = req.user?.sub;

@@ -50,11 +50,11 @@ export class AdminMediaModerationController {
       kind: item.kind,
       title: item.translations.find((x) => x.locale === 'en')?.title ?? null,
       uploaderId: item.uploaderId,
-      uploaderName: item.uploader?.displayName || item.uploader?.username || null,
+      uploaderName:
+        item.uploader?.displayName || item.uploader?.username || null,
       createdAt: item.createdAt,
       status: item.status,
-      rejectionReason:
-        item.status === 'REJECTED' ? item.rejectionReason : null,
+      rejectionReason: item.status === 'REJECTED' ? item.rejectionReason : null,
       moderationVersion: item.moderationVersion,
       resubmittedAt: item.resubmittedAt?.toISOString() ?? null,
       asset: item.asset
@@ -154,7 +154,9 @@ export class AdminMediaModerationController {
     });
     if (!item) throw new NotFoundException('Media item not found');
     if (item.status !== 'APPROVED' && item.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Only approved or pending media can be published');
+      throw new BadRequestException(
+        'Only approved or pending media can be published',
+      );
     }
 
     const updated = await this.prisma.mediaItem.update({

@@ -28,7 +28,9 @@ export class UploadLimitsController {
         ],
       },
       image: {
-        maxBytes: isPending ? IMAGE_SIZE_LIMITS.pending : IMAGE_SIZE_LIMITS.approved,
+        maxBytes: isPending
+          ? IMAGE_SIZE_LIMITS.pending
+          : IMAGE_SIZE_LIMITS.approved,
         allowedTypes: getAllowedMimeTypes('IMAGE' as MediaKind),
       },
       document: {

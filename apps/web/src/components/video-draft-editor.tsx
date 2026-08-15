@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import {
+  ChannelTaxonomyPicker,
+  type TaxonomyCategory,
+} from "@/components/videos/channel-taxonomy-picker";
+import {
+  TagPicker,
+  type TagOption,
+  type TagSelection,
+} from "@/components/videos/tag-picker";
 import { VideoVisibilitySelector } from "@/components/videos/VideoVisibilitySelector";
 import { VideoScheduleEditor } from "@/components/videos/VideoScheduleEditor";
 import { CopyShareLinkButton } from "@/components/CopyShareLinkButton";
@@ -20,7 +29,6 @@ type Translation = {
 };
 
 type Channel = { id: string; slug: string; name: string };
-type Tag = { id: string; slug: string; name: string };
 
 type VideoDraft = {
   id: string;
@@ -44,8 +52,11 @@ type VideoDraft = {
   archivedBy?: string | null;
   translations: Translation[];
   channels: Array<{ channel: { slug: string; name: string } }>;
+  primaryChannel?: { slug: string } | null;
   tags: Array<{ tag: { slug: string; name: string } }>;
 };
+
+const MAX_TAGS_PER_VIDEO = 15;
 
 export default function VideoDraftEditor({ videoId, locale: propLocale }: { videoId: string; locale?: string }) {
   const api = process.env.NEXT_PUBLIC_API_URL!;
@@ -55,7 +66,8 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
 
   const [video, setVideo] = useState<VideoDraft | null>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [taxonomy, setTaxonomy] = useState<TaxonomyCategory[]>([]);
+  const [tags, setTags] = useState<TagOption[]>([]);
   const [activeLocale, setActiveLocale] = useState<string>(locale);
   const [message, setMessage] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -69,7 +81,8 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
   });
 
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [primaryChannel, setPrimaryChannel] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<TagSelection[]>([]);
   const [isResubmitting, setIsResubmitting] = useState(false);
 
   useEffect(() => {
@@ -99,8 +112,16 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
         });
 
         setFormData(translations);
-        setSelectedChannels(data.channels?.map((c: any) => c.channel.slug) || []);
-        setSelectedTags(data.tags?.map((t: any) => t.tag.slug) || []);
+        const channelSlugs: string[] =
+          data.channels?.map((c: any) => c.channel.slug) || [];
+        setSelectedChannels(channelSlugs);
+        setPrimaryChannel(data.primaryChannel?.slug ?? channelSlugs[0] ?? null);
+        setSelectedTags(
+          data.tags?.map((t: any) => ({
+            slug: t.tag.slug,
+            name: t.tag.name,
+          })) || [],
+        );
         setLoading(false);
       })
       .catch((e) => {
@@ -108,7 +129,13 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
         setLoading(false);
       });
 
-    // Load channels and tags
+    // Load the taxonomy tree plus the flat channel list; the difference between
+    // them is the set of channels admins have not mapped yet.
+    fetch(`${api}/categories?locale=${locale}`)
+      .then((r) => r.json())
+      .then(setTaxonomy)
+      .catch(() => {});
+
     fetch(`${api}/channels?locale=${locale}`)
       .then((r) => r.json())
       .then(setChannels)
@@ -120,23 +147,42 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
       .catch(() => {});
   }, [api, videoId, token, locale]);
 
+  const unmappedChannels = useMemo(() => {
+    const mapped = new Set(
+      taxonomy.flatMap((c) =>
+        c.subcategories.flatMap((s) => s.channels.map((ch) => ch.slug)),
+      ),
+    );
+    return channels.filter((c) => !mapped.has(c.slug));
+  }, [taxonomy, channels]);
+
+  const searchTags = useCallback(
+    (query: string) => {
+      const q = query.trim();
+      if (q.length < 2) return;
+
+      fetch(
+        `${api}/tags?locale=${locale}&q=${encodeURIComponent(q)}`,
+      )
+        .then((r) => r.json())
+        .then((results: TagOption[]) => {
+          // Merge instead of replace so already-selected chips keep their labels.
+          setTags((prev) => {
+            const bySlug = new Map(prev.map((t) => [t.slug, t]));
+            for (const tag of results) bySlug.set(tag.slug, tag);
+            return [...bySlug.values()];
+          });
+        })
+        .catch(() => {});
+    },
+    [api, locale],
+  );
+
   const updateTranslation = (loc: string, field: keyof Translation, value: string) => {
     setFormData((prev) => ({
       ...prev,
       [loc]: { ...prev[loc], [field]: value },
     }));
-  };
-
-  const toggleChannel = (slug: string) => {
-    setSelectedChannels((prev) =>
-      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
-    );
-  };
-
-  const toggleTag = (slug: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
-    );
   };
 
   const saveDraft = async () => {
@@ -156,13 +202,24 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
             (t) => t.title || t.description || t.tagline
           ),
           channels: selectedChannels,
-          tags: selectedTags,
+          primaryChannel: primaryChannel ?? undefined,
+          tags: selectedTags.filter((t) => t.slug).map((t) => t.slug),
+          newTags: selectedTags.filter((t) => !t.slug).map((t) => t.name),
         }),
       });
 
       if (!res.ok) {
         const errorText = await res.text();
         throw new Error(errorText);
+      }
+
+      // Newly created tags only get slugs server-side, so re-read the draft to
+      // turn "new" chips into resolved ones.
+      const saved = await res.json().catch(() => null);
+      if (saved?.tags) {
+        setSelectedTags(
+          saved.tags.map((t: any) => ({ slug: t.tag.slug, name: t.tag.name })),
+        );
       }
 
       setMessage("Draft saved successfully ✅");
@@ -427,49 +484,26 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
         </div>
       </div>
 
-      {/* Channels */}
-      <div className="space-y-2">
-        <div className="text-sm font-medium">Channels</div>
-        <div className="flex flex-wrap gap-2">
-          {channels.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              className={`rounded-xl border px-3 py-1 text-sm ${
-                selectedChannels.includes(c.slug)
-                  ? "bg-blue-100 dark:bg-blue-900 font-semibold"
-                  : ""
-              }`}
-              onClick={() => editable && toggleChannel(c.slug)}
-              disabled={!editable}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
-      </div>
+      <ChannelTaxonomyPicker
+        tree={taxonomy}
+        unmappedChannels={unmappedChannels}
+        selected={selectedChannels}
+        primary={primaryChannel}
+        disabled={!editable}
+        onChange={(next, nextPrimary) => {
+          setSelectedChannels(next);
+          setPrimaryChannel(nextPrimary);
+        }}
+      />
 
-      {/* Tags */}
-      <div className="space-y-2">
-        <div className="text-sm font-medium">Tags</div>
-        <div className="flex flex-wrap gap-2">
-          {tags.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={`rounded-xl border px-3 py-1 text-sm ${
-                selectedTags.includes(t.slug)
-                  ? "bg-blue-100 dark:bg-blue-900 font-semibold"
-                  : ""
-              }`}
-              onClick={() => editable && toggleTag(t.slug)}
-              disabled={!editable}
-            >
-              {t.name}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TagPicker
+        options={tags}
+        value={selectedTags}
+        max={MAX_TAGS_PER_VIDEO}
+        disabled={!editable}
+        onChange={setSelectedTags}
+        onQueryChange={searchTags}
+      />
 
       {/* Visibility Selector */}
       {editable && video && (

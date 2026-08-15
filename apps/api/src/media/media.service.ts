@@ -7,6 +7,9 @@ import {
 import { MediaKind, MediaStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { writeMediaAuditLog } from './media-audit.util';
+import { ContentTaxonomyService } from '../taxonomy/content-taxonomy.service';
+import { TagsService } from '../tags/tags.service';
+import { MAX_TAGS_PER_ITEM } from '../common/taxonomy/normalize.util';
 
 const EDITABLE_STATUSES: MediaStatus[] = [
   'DRAFT',
@@ -18,7 +21,11 @@ const EDITABLE_STATUSES: MediaStatus[] = [
 
 @Injectable()
 export class MediaService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private contentTaxonomy: ContentTaxonomyService,
+    private tags: TagsService,
+  ) {}
 
   async createDraft(
     externalId: string,
@@ -29,7 +36,9 @@ export class MediaService {
       description?: string;
       tagline?: string;
       channelIds?: string[];
+      primaryChannelId?: string;
       tagIds?: string[];
+      newTags?: string[];
     },
   ) {
     if (!data.kind || !['IMAGE', 'DOCUMENT'].includes(data.kind)) {
@@ -44,6 +53,15 @@ export class MediaService {
     const prefix = data.kind === 'IMAGE' ? 'img' : 'doc';
     const slug = `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
+    const channelIds = data.channelIds?.length
+      ? await this.contentTaxonomy.resolveChannelIdsById(data.channelIds)
+      : [];
+    const primaryChannelId = this.contentTaxonomy.resolvePrimaryChannelIdById(
+      channelIds,
+      data.primaryChannelId,
+    );
+    const tagIds = await this.resolveTagIds(data, user.id);
+
     const mediaItem = await this.prisma.mediaItem.create({
       data: {
         slug,
@@ -52,6 +70,7 @@ export class MediaService {
         visibility: 'PRIVATE',
         uploaderId: user.id,
         uploaderVisible: false,
+        primaryChannelId,
         translations: {
           create: {
             locale: data.locale || 'en',
@@ -60,11 +79,13 @@ export class MediaService {
             tagline: data.tagline,
           },
         },
-        channels: data.channelIds?.length
-          ? { create: data.channelIds.map((channelId) => ({ channelId })) }
+        channels: channelIds.length
+          ? { create: channelIds.map((channelId) => ({ channelId })) }
           : undefined,
-        tags: data.tagIds?.length
-          ? { create: data.tagIds.map((tagId) => ({ tagId })) }
+        tags: tagIds.length
+          ? {
+              create: tagIds.map((tagId) => ({ tagId, addedById: user.id })),
+            }
           : undefined,
       },
       include: {
@@ -163,13 +184,36 @@ export class MediaService {
         tagline?: string | null;
       }>;
       channelIds?: string[];
+      primaryChannelId?: string;
       tagIds?: string[];
+      newTags?: string[];
     },
   ) {
     const item = await this.getOwnedItem(mediaItemId, externalId);
     if (!EDITABLE_STATUSES.includes(item.status)) {
-      throw new BadRequestException('Media item cannot be edited in current status');
+      throw new BadRequestException(
+        'Media item cannot be edited in current status',
+      );
     }
+
+    // Same ordering rule as videos: validate and create tags before the
+    // transaction so a constraint race cannot abort the translation writes.
+    const channelsProvided = data.channelIds !== undefined;
+    const channelIds = channelsProvided
+      ? await this.contentTaxonomy.resolveChannelIdsById(data.channelIds)
+      : [];
+    const primaryChannelId = channelsProvided
+      ? this.contentTaxonomy.resolvePrimaryChannelIdById(
+          channelIds,
+          data.primaryChannelId,
+        )
+      : undefined;
+
+    const tagsProvided =
+      data.tagIds !== undefined || data.newTags !== undefined;
+    const tagIds = tagsProvided
+      ? await this.resolveTagIds(data, item.uploaderId)
+      : [];
 
     return this.prisma.$transaction(async (tx) => {
       if (data.translations?.length) {
@@ -197,20 +241,29 @@ export class MediaService {
         }
       }
 
-      if (data.channelIds) {
+      if (channelsProvided) {
         await tx.mediaItemChannel.deleteMany({ where: { mediaItemId } });
-        if (data.channelIds.length) {
+        if (channelIds.length) {
           await tx.mediaItemChannel.createMany({
-            data: data.channelIds.map((channelId) => ({ mediaItemId, channelId })),
+            data: channelIds.map((channelId) => ({ mediaItemId, channelId })),
           });
         }
+
+        await tx.mediaItem.update({
+          where: { id: mediaItemId },
+          data: { primaryChannelId: primaryChannelId ?? null },
+        });
       }
 
-      if (data.tagIds) {
+      if (tagsProvided) {
         await tx.mediaItemTag.deleteMany({ where: { mediaItemId } });
-        if (data.tagIds.length) {
+        if (tagIds.length) {
           await tx.mediaItemTag.createMany({
-            data: data.tagIds.map((tagId) => ({ mediaItemId, tagId })),
+            data: tagIds.map((tagId) => ({
+              mediaItemId,
+              tagId,
+              addedById: item.uploaderId,
+            })),
           });
         }
       }
@@ -269,6 +322,67 @@ export class MediaService {
     });
 
     return { success: true, mediaItemId, status: updated.status };
+  }
+
+  /**
+   * Media assigns existing tags by id (its editor never learned slugs) while the
+   * video editor uses slugs, but both go through the same governance rules:
+   * blocked tags are rejected, merged tags follow their pointer, and new names
+   * are created through TagsService.
+   */
+  private async resolveTagIds(
+    data: { tagIds?: string[]; newTags?: string[] },
+    actorUserId?: string,
+  ): Promise<string[]> {
+    const ids: string[] = [];
+    const seen = new Set<string>();
+
+    const push = (id: string) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      ids.push(id);
+    };
+
+    if (data.tagIds?.length) {
+      const requested = [...new Set(data.tagIds)];
+      const tags = await this.prisma.tag.findMany({
+        where: { id: { in: requested } },
+      });
+      const byId = new Map(tags.map((t) => [t.id, t]));
+
+      for (const id of requested) {
+        const tag = byId.get(id);
+        if (!tag) throw new BadRequestException(`Unknown tag "${id}"`);
+        if (tag.status === 'BLOCKED') {
+          throw new BadRequestException(`The tag "${tag.name}" is not allowed`);
+        }
+        push(
+          tag.status === 'MERGED' && tag.mergedIntoTagId
+            ? tag.mergedIntoTagId
+            : tag.id,
+        );
+      }
+    }
+
+    if (data.newTags?.length) {
+      const asPending = !(await this.tags.isApprovedCreator(actorUserId));
+
+      for (const name of data.newTags) {
+        const tag = await this.tags.findOrCreate(name, {
+          actorUserId,
+          asPending,
+        });
+        push(tag.id);
+      }
+    }
+
+    if (ids.length > MAX_TAGS_PER_ITEM) {
+      throw new BadRequestException(
+        `A maximum of ${MAX_TAGS_PER_ITEM} tags can be applied`,
+      );
+    }
+
+    return ids;
   }
 
   private async getOwnedItem(mediaItemId: string, externalId: string) {

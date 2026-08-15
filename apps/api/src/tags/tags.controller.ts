@@ -6,7 +6,10 @@ export class TagsController {
   constructor(private tagsService: TagsService) {}
 
   @Get()
-  async findAll(@Query('locale') locale: string = 'en') {
-    return this.tagsService.findAll(locale);
+  async findAll(
+    @Query('locale') locale: string = 'en',
+    @Query('q') q?: string,
+  ) {
+    return this.tagsService.findAll(locale, q);
   }
 }

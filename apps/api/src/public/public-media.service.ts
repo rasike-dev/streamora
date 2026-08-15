@@ -18,7 +18,10 @@ export class PublicMediaService {
 
   async listPublicMedia(locale: string, page: number) {
     const pageSize = 24;
-    const where = { status: 'PUBLISHED' as const, visibility: 'PUBLIC' as const };
+    const where = {
+      status: 'PUBLISHED' as const,
+      visibility: 'PUBLIC' as const,
+    };
 
     const [items, total] = await Promise.all([
       this.prisma.mediaItem.findMany({
@@ -75,7 +78,8 @@ export class PublicMediaService {
       : previewUrl;
 
     const showUploader =
-      item.uploaderVisible && item.uploader?.creatorProfile?.approval === 'APPROVED';
+      item.uploaderVisible &&
+      item.uploader?.creatorProfile?.approval === 'APPROVED';
 
     return {
       id: item.id,
@@ -123,7 +127,7 @@ export class PublicMediaService {
     };
   }
 
-  async recordView(mediaItemId: string, req: any) {
+  async recordView(mediaItemId: string, _req: any) {
     await this.prisma.mediaItem.update({
       where: { id: mediaItemId },
       data: {

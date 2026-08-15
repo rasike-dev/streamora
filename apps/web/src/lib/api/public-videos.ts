@@ -1,6 +1,8 @@
 export async function getPublicVideos(params: {
   locale: string;
   q?: string;
+  category?: string;
+  subcategory?: string;
   channel?: string;
   tag?: string;
   page?: number;
@@ -14,6 +16,8 @@ export async function getPublicVideos(params: {
   });
 
   if (params.q) search.set('q', params.q);
+  if (params.category) search.set('category', params.category);
+  if (params.subcategory) search.set('subcategory', params.subcategory);
   if (params.channel) search.set('channel', params.channel);
   if (params.tag) search.set('tag', params.tag);
 

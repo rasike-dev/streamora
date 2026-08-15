@@ -111,7 +111,8 @@ Built-in from the start — not an afterthought. Positions Streamora for **regio
 A full editing workspace where creators set:
 
 - Title, tagline, description  
-- Channels and tags (categories)  
+- Classification: pick a Category, then a Subcategory, then one or more Channels, and mark one as the primary  
+- Tags, typed freely with autocomplete — an unrecognised tag is created on the spot  
 - Visibility (public, unlisted, private)  
 - Optional publish schedule  
 - Thumbnails and subtitles  
@@ -240,8 +241,11 @@ Viewers can:
 
 - Browse all public videos  
 - Search by keywords  
+- Drill down **Category → Subcategory → Channel** from a single browse page  
+- Filter the video list by category, subcategory, channel or tag  
 - Explore **channel** pages (e.g. “Sports”, “Education”)  
 - Explore **tag** pages (e.g. “tutorial”, “news”)  
+- Follow the breadcrumb on any video back up to its subcategory and category  
 
 **Why it matters**  
 - Videos aren’t useful if nobody finds them  
@@ -249,7 +253,7 @@ Viewers can:
 - Search supports intent (“find the onboarding video”)  
 
 **What makes it stand out**  
-Locale-aware names and descriptions — discovery works in the audience’s language, not only English.
+Locale-aware names and descriptions — discovery works in the audience’s language, not only English. The hierarchy is a browsing structure, not just a filter: a viewer who knows only "election campaigns" can reach a specific channel in two clicks.
 
 ---
 
@@ -314,7 +318,7 @@ Privacy-respecting measurement (hashed viewer identity, no raw personal tracking
 ### 16. Content governance (takedown, archive, restore)
 
 **What it is**  
-Admins can remove published videos (takedown) or archive them, with reasons recorded. Restored videos can go live again if appropriate.
+Admins can remove published videos (takedown) or archive them, with reasons recorded. Restored videos can go live again if appropriate. Actions are written to an audit log.
 
 **Why it matters**  
 - Respond to copyright, policy, or safety issues  
@@ -326,7 +330,73 @@ Admins can remove published videos (takedown) or archive them, with reasons reco
 
 ---
 
-### 17. Reliable cloud infrastructure
+### 17. Short share links
+
+**What it is**  
+Creators generate compact URLs (e.g. `/s/abc123`) that redirect to the full video page with analytics attributed as “share” traffic.
+
+**Why it matters**  
+- Cleaner links for WhatsApp, SMS, and print  
+- One stable short link per video (reused on repeat copy)  
+- Foundation for campaign tracking later  
+
+---
+
+### 18. Embeddable player
+
+**What it is**  
+Public videos can be embedded on external sites via a minimal iframe player. Copy-embed-code is available on share and creator edit pages.
+
+**Why it matters**  
+- Partners and news sites can embed without re-hosting  
+- Playback analytics distinguish external embeds (`EXTERNAL` source)  
+- Only **published + public** videos are embeddable  
+
+---
+
+### 19. Rejection feedback and resubmission
+
+**What it is**  
+When admins reject a video, they provide a reason (and optional notes). Creators see that feedback, fix metadata or content, and **resubmit** for another review. Admins see revision number and prior rejection context.
+
+**Why it matters**  
+- Turns rejection into a constructive loop, not a dead end  
+- Reduces back-and-forth email  
+- Audit-friendly moderation cycles  
+
+---
+
+### 20. Media items (images and documents)
+
+**What it is**  
+In addition to video, creators can upload **images** and **documents** through a parallel `/upload/media` flow with its own dashboard, moderation queue, and governance (takedown/archive).
+
+**Why it matters**  
+- Supports mixed-media portals (posters, PDFs, guides alongside video)  
+- Same trust model: review before public exposure  
+
+---
+
+### 21. Governed categories and tags
+
+**What it is**  
+Two complementary ways to organise the library, with different rules:
+
+- **Categories, subcategories and channels** are curated. Only admins create them, so the structure stays stable and predictable — a creator classifies into it but never adds to it.
+- **Tags** are open. Creators type whatever describes their video and a new tag is created on the spot, while admins and moderators clean up afterwards: merge duplicates, block abusive terms, feature the good ones.
+
+**Why it matters**  
+- Free-form tagging without governance turns into hundreds of near-identical labels ("AI", "A.I.", "ai ") that split the same audience across several dead ends  
+- Streamora treats "AI" and " #A.I. " as the same tag automatically, in English, Sinhala and Tamil  
+- When an admin merges two tags, links people already shared keep working — the old tag address redirects to the surviving one  
+- Tags created by creators who are still awaiting approval stay private to their own video until reviewed
+
+**What makes it stand out**  
+Most platforms make you choose between a rigid taxonomy nobody fits into and a free-for-all nobody can navigate. Streamora runs both, with an admin console showing exactly how many videos a change will affect before it is made.
+
+---
+
+### 22. Reliable cloud infrastructure
 
 **What it is (in plain terms)**  
 Streamora runs on Google Cloud:
@@ -370,10 +440,16 @@ Streamora runs on Google Cloud:
 | Area | Status |
 |------|--------|
 | Upload, processing, moderation, publish | **Live and tested** |
-| Share pages and social buttons | **Live** |
+| Share pages, social buttons, short links, embed | **Live** |
+| Rejection feedback + resubmission | **Live** |
+| Takedown / archive / restore + audit log | **Live** |
+| Subtitles + media items (image/document) | **Live** |
+| Category → Subcategory → Channel hierarchy + tag governance | **Live** |
+| Alias authoring UI, suggested tags, taxonomy analytics | **Not yet** (deferred Phase F) |
 | Analytics | **Live** (data appears after real public views) |
 | Social link previews on localhost | **Requires production URL** for WhatsApp/X crawlers |
-| Redis caching | **Planned** — not required for launch |
+| Redis caching / production rate limits | **Planned** — not required for launch |
+| Trending, watch history, auto-captions | **Not yet** |
 
 ---
 
@@ -390,13 +466,19 @@ Streamora runs on Google Cloud:
 | Visibility modes | Public, link-only, or private |
 | Scheduled publish | Launch at the right time |
 | Moderation queue | Trust and brand safety |
+| Rejection + resubmit | Actionable feedback loop |
 | Browse & search | Discovery |
 | Channels & tags | Organized catalogs |
+| Category hierarchy | Two-click browsing from broad theme to specific channel |
+| Tag governance | Duplicates merged, abuse blocked, old links still work |
 | Share pages | Growth via WhatsApp and social |
+| Short links | Cleaner URLs for sharing |
+| Embed player | Distribution on partner sites |
 | Adaptive streaming | Smooth viewing everywhere |
 | Analytics | Measure impact |
 | Takedown / archive | Compliance and control |
+| Media items | Images and documents under same governance |
 
 ---
 
-*Document version: March 2026 — aligned with Streamora Phase 0–3 product scope.*
+*Document version: August 2026 — aligned with Streamora Phase 0–3 (Days 1–27) plus subtitles, media items, and taxonomy & tag governance.*
