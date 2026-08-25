@@ -2,7 +2,7 @@
 export const brand = {
   name: "SLPoliNet",
   domain: "slpolinet.com",
-  tagline: "Political data • Media library • Insights",
+  tagline: "Official video sharing platform for SLPP",
 } as const;
 
 export const logoAssets = {

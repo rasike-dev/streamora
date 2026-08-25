@@ -2,6 +2,8 @@
   {
     "origin": [
       "http://localhost:3000",
+      "https://slpolinet.com",
+      "https://www.slpolinet.com",
       "https://streamora.app",
       "https://admin.streamora.app"
     ],

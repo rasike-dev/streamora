@@ -4,7 +4,7 @@
 # Usage: PROJECT_ID=... REGION=us-central1 ENV=staging IMAGE_TAG=latest ./infra/scripts/deploy-staging.sh
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-streamora-487815}"
+PROJECT_ID="${PROJECT_ID:-slpolinet-prod}"
 REGION="${REGION:-us-central1}"
 ENV="${ENV:-staging}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"

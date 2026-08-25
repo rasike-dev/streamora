@@ -62,27 +62,30 @@ export default async function HomePage({ params }: PageProps) {
       <SiteHeader locale={locale} />
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-10 sm:py-16">
-        <section className="mx-auto w-full max-w-3xl text-center">
-          <BrandLogo variant="hero" priority className="mb-8 sm:mb-10" />
-          <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
-            {t("heroTitle")}
-          </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-pretty text-base text-muted-foreground sm:text-lg">
-            {t("heroSubtitle")}
-          </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href={`/${locale}/videos`}
-              className="inline-flex w-full min-w-[12rem] items-center justify-center rounded-xl bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90 sm:w-auto"
-            >
-              {t("ctaBrowse")}
-            </Link>
-            <Link
-              href={`/${locale}/sign-in`}
-              className="inline-flex w-full min-w-[12rem] items-center justify-center rounded-xl border border-black/15 px-6 py-3 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06] sm:w-auto"
-            >
-              {t("ctaCreatorLogin")}
-            </Link>
+        <section className="mx-auto w-full max-w-5xl text-center">
+          <BrandLogo variant="hero" priority className="mb-10 sm:mb-12" />
+
+          <div className="mx-auto max-w-3xl rounded-2xl border border-black/10 bg-gradient-to-b from-black/[0.03] to-transparent px-4 py-8 dark:border-white/10 dark:from-white/[0.04] sm:px-8 sm:py-10">
+            <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
+              {t("heroTitle")}
+            </h1>
+            <p className="mx-auto mt-5 max-w-2xl text-pretty text-base text-muted-foreground sm:text-lg">
+              {t("heroSubtitle")}
+            </p>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Link
+                href={`/${locale}/videos`}
+                className="inline-flex w-full min-w-[12rem] items-center justify-center rounded-xl bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90 sm:w-auto"
+              >
+                {t("ctaBrowse")}
+              </Link>
+              <Link
+                href={`/${locale}/sign-in`}
+                className="inline-flex w-full min-w-[12rem] items-center justify-center rounded-xl border border-black/15 px-6 py-3 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06] sm:w-auto"
+              >
+                {t("ctaCreatorLogin")}
+              </Link>
+            </div>
           </div>
         </section>
 

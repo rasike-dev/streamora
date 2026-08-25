@@ -20,7 +20,7 @@ export async function SiteHeader({ locale }: { locale: string }) {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:py-4">
         <Link
           href={`/${locale}`}
-          className="min-w-0 shrink-0 transition opacity-90 hover:opacity-100"
+          className="min-w-0 shrink-0 transition hover:opacity-95"
           aria-label={brand.name}
         >
           <BrandLogo variant="header" priority />

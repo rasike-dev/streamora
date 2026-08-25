@@ -20,13 +20,12 @@ body {
 }
 
 @layer components {
-  /* Logo PNGs ship on black — give them a plate in light mode only. */
-  .logo-plate {
-    @apply inline-flex items-center justify-center overflow-hidden rounded-lg bg-neutral-950;
+  .logo-wrap {
+    @apply inline-flex items-center justify-center;
   }
 
-  .dark .logo-plate {
-    @apply rounded-lg bg-transparent;
+  .logo-wrap-prominent {
+    @apply block w-full;
   }
 }
 

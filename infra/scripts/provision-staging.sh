@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Provision Streamora staging resources on GCP.
-# Usage: PROJECT_ID=streamora-487815 REGION=us-central1 ./infra/scripts/provision-staging.sh
+# Usage: PROJECT_ID=slpolinet-prod REGION=us-central1 ./infra/scripts/provision-staging.sh
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-streamora-487815}"
+PROJECT_ID="${PROJECT_ID:-slpolinet-prod}"
 REGION="${REGION:-us-central1}"
 ENV_LABEL="${ENV_LABEL:-staging}"
 

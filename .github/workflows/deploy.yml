@@ -13,7 +13,7 @@ on:
           - prod
 
 env:
-  PROJECT_ID: streamora-487815
+  PROJECT_ID: slpolinet-prod
   REGION: us-central1
 
 jobs:

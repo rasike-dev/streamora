@@ -3,7 +3,7 @@
 # Usage: DOMAIN=streamora.app ENV=staging ./infra/scripts/setup-domain.sh
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-streamora-487815}"
+PROJECT_ID="${PROJECT_ID:-slpolinet-prod}"
 REGION="${REGION:-us-central1}"
 DOMAIN="${DOMAIN:-streamora.app}"
 ENV="${ENV:-prod}"
