@@ -275,3 +275,59 @@ describe('TagsService.resolveTagIds (AC-05)', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe('TagsService.findAll (AC-05)', () => {
+  it('returns localized ACTIVE tags for autocomplete', async () => {
+    const prisma = {
+      tag: {
+        findMany: jest.fn(async () => [
+          {
+            id: 'tag-1',
+            slug: 'tutorial',
+            name: 'Tutorial',
+            preferred: true,
+            translations: [
+              { locale: 'si', name: 'උපදේශනය' },
+              { locale: 'en', name: 'Tutorial' },
+            ],
+          },
+        ]),
+      },
+    } as unknown as PrismaService;
+    const service = new TagsService(prisma);
+
+    const tags = await service.findAll('si');
+
+    expect(tags).toEqual([
+      { id: 'tag-1', slug: 'tutorial', name: 'උපදේශනය', preferred: true },
+    ]);
+    expect(prisma.tag.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'ACTIVE' } }),
+    );
+  });
+
+  it('limits search results and matches aliases', async () => {
+    const prisma = {
+      tag: {
+        findMany: jest.fn(async () => []),
+      },
+    } as unknown as PrismaService;
+    const service = new TagsService(prisma);
+
+    await service.findAll('en', 'election');
+
+    expect(prisma.tag.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: 'ACTIVE',
+          OR: expect.arrayContaining([
+            expect.objectContaining({
+              aliases: expect.any(Object),
+            }),
+          ]),
+        }),
+        take: 20,
+      }),
+    );
+  });
+});

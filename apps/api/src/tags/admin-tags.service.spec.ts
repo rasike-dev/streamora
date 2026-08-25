@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { AdminTagsService } from './admin-tags.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -107,6 +111,8 @@ function makeStub(seed: {
         async ({ where }: any) =>
           tags.find((t) => t.normalizedName === where.normalizedName) ?? null,
       ),
+      findMany: jest.fn(async () => []),
+      count: jest.fn(async () => 0),
       update: tx.tag.update,
     },
     videoTag: {
@@ -263,6 +269,199 @@ describe('AdminTagsService.merge (AC-07, AC-12)', () => {
     expect(preview.aliasCreated).toBe('rally');
     expect(preview.videosMoved).toBe(applied.movedVideos);
     expect(preview.duplicatesDropped).toBe(applied.duplicatesDropped);
+  });
+});
+
+describe('AdminTagsService.list and addAlias (AC-07)', () => {
+  it('lists tags with usage counts and pagination metadata', async () => {
+    const tags = [
+      {
+        id: 'tag-1',
+        name: 'Tutorial',
+        slug: 'tutorial',
+        normalizedName: 'tutorial',
+        status: 'ACTIVE',
+        preferred: true,
+        createdById: 'creator-1',
+        createdAt: new Date('2026-01-01'),
+        translations: [{ locale: 'en', name: 'Tutorial', description: null }],
+        aliases: [{ alias: 'how-to' }],
+        mergedInto: null,
+        _count: { videos: 4, mediaItems: 1 },
+      },
+    ];
+    const prisma = {
+      tag: {
+        count: jest.fn(async () => 1),
+        findMany: jest.fn(async () => tags),
+      },
+      user: {
+        findMany: jest.fn(async () => [
+          { id: 'creator-1', displayName: 'Creator One', username: 'creator1' },
+        ]),
+      },
+    } as unknown as PrismaService;
+    const service = new AdminTagsService(prisma);
+
+    const result = await service.list({
+      status: 'ACTIVE',
+      page: 1,
+      pageSize: 10,
+    });
+
+    expect(result.pagination.total).toBe(1);
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        slug: 'tutorial',
+        usageCount: 5,
+        aliases: ['how-to'],
+        createdBy: { id: 'creator-1', name: 'Creator One' },
+      }),
+    );
+  });
+
+  it('creates an alias when the name is free', async () => {
+    const tag = {
+      id: 'tag-1',
+      name: 'AI',
+      slug: 'ai',
+      normalizedName: 'ai',
+      status: 'ACTIVE',
+    };
+    const aliases: any[] = [];
+    const audits: any[] = [];
+    const prisma = {
+      tag: {
+        findUnique: jest.fn(async () => tag),
+        findFirst: jest.fn(async () => null),
+      },
+      tagAlias: {
+        findUnique: jest.fn(async () => null),
+        create: jest.fn(async ({ data }: any) => {
+          aliases.push(data);
+          return { id: 'alias-1', ...data };
+        }),
+      },
+      taxonomyAuditLog: {
+        create: jest.fn(async ({ data }: any) => {
+          audits.push(data);
+          return data;
+        }),
+      },
+    } as unknown as PrismaService;
+    const service = new AdminTagsService(prisma);
+
+    const alias = await service.addAlias('tag-1', { alias: 'A.I.' }, ACTOR);
+
+    expect(alias.normalizedAlias).toBe('a.i.');
+    expect(audits).toContainEqual(
+      expect.objectContaining({
+        entityType: 'TAG',
+        action: 'TAG_ALIAS_ADDED',
+        actorUserId: ACTOR,
+      }),
+    );
+  });
+});
+
+describe('AdminTagsService.createTag and updateTag (AC-07)', () => {
+  it('creates an admin tag with canonical normalization', async () => {
+    const audits: any[] = [];
+    const prisma = {
+      tag: {
+        findFirst: jest.fn(async () => null),
+        count: jest.fn(async () => 0),
+        create: jest.fn(async ({ data, include }) => ({
+          id: 'tag-new',
+          ...data,
+          translations: include?.translations
+            ? [{ locale: 'en', name: data.name }]
+            : [],
+        })),
+        update: jest.fn(),
+      },
+      tagAlias: { findUnique: jest.fn(async () => null) },
+      tagTranslation: { upsert: jest.fn() },
+      taxonomyAuditLog: {
+        create: jest.fn(async ({ data }) => {
+          audits.push(data);
+          return data;
+        }),
+      },
+    } as unknown as PrismaService;
+    const service = new AdminTagsService(prisma);
+
+    const tag = await service.createTag({
+      name: '  #Town Hall ',
+      preferred: true,
+      actorId: ACTOR,
+    });
+
+    expect(tag.slug).toBe('town-hall');
+    expect(tag.normalizedName).toBe('town hall');
+    expect(tag.preferred).toBe(true);
+    expect(audits).toContainEqual(
+      expect.objectContaining({
+        action: 'TAXONOMY_CREATED',
+        actorUserId: ACTOR,
+      }),
+    );
+  });
+
+  it('rejects creating a tag that duplicates an existing canonical key', async () => {
+    const prisma = {
+      tag: {
+        findFirst: jest.fn(async () => ({
+          id: 'tag-1',
+          name: 'Town Hall',
+          slug: 'town-hall',
+        })),
+      },
+      tagAlias: { findUnique: jest.fn(async () => null) },
+    } as unknown as PrismaService;
+    const service = new AdminTagsService(prisma);
+
+    await expect(
+      service.createTag({ name: 'Town Hall', actorId: ACTOR }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('updates a tag name and preferred flag', async () => {
+    const audits: any[] = [];
+    const prisma = {
+      tag: {
+        findUnique: jest.fn(async () => ({
+          id: 'tag-1',
+          name: 'Old',
+          slug: 'old',
+          normalizedName: 'old',
+          status: 'ACTIVE',
+        })),
+        findFirst: jest.fn(async () => null),
+        update: jest.fn(async ({ data }) => ({ id: 'tag-1', ...data })),
+      },
+      tagAlias: { findUnique: jest.fn(async () => null) },
+      tagTranslation: { upsert: jest.fn() },
+      taxonomyAuditLog: {
+        create: jest.fn(async ({ data }) => {
+          audits.push(data);
+          return data;
+        }),
+      },
+    } as unknown as PrismaService;
+    const service = new AdminTagsService(prisma);
+
+    const updated = await service.updateTag('tag-1', {
+      name: 'Featured Topic',
+      preferred: true,
+      actorId: ACTOR,
+    });
+
+    expect(updated.name).toBe('Featured Topic');
+    expect(updated.preferred).toBe(true);
+    expect(audits).toContainEqual(
+      expect.objectContaining({ action: 'TAXONOMY_UPDATED' }),
+    );
   });
 });
 

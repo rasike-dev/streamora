@@ -3,19 +3,23 @@ import { PrismaService } from '../prisma/prisma.service';
 
 type RawCall = { sql: string; params: any[] };
 
-function makeService() {
+function makeService(seed?: {
+  searchResults?: Array<{ id: string; score: number }>;
+  total?: number;
+  videos?: any[];
+}) {
   const calls: RawCall[] = [];
+  const searchResults = seed?.searchResults ?? [{ id: 'video-1', score: 1 }];
+  const total = seed?.total ?? 1;
+  const videos = seed?.videos ?? [];
 
   const prisma = {
     $queryRawUnsafe: jest.fn(async (sql: string, ...params: any[]) => {
       calls.push({ sql, params });
-
-      // First call is the paged id query, second is the count query.
-      return calls.length === 1
-        ? [{ id: 'video-1', score: 1 }]
-        : [{ count: 1 }];
+      if (sql.includes('COUNT(*)')) return [{ count: total }];
+      return searchResults;
     }),
-    video: { findMany: jest.fn(async () => []) },
+    video: { findMany: jest.fn(async () => videos) },
   } as unknown as PrismaService;
 
   return { service: new SearchService(prisma), calls };
@@ -121,5 +125,50 @@ describe('SearchService parameter binding (AC-09)', () => {
     expect(calls[0].sql).toContain('EXISTS');
     expect(calls[0].sql).toContain('"Subcategory"');
     expect(calls[0].sql).toContain('"Category"');
+  });
+
+  it('returns an empty ranked page when the SQL finds no matches', async () => {
+    const { service } = makeService({ searchResults: [] });
+
+    const result = await service.searchPublicVideos(base);
+
+    expect(result).toEqual({
+      items: [],
+      pagination: { page: 1, pageSize: 12, total: 0, totalPages: 0 },
+      searchMeta: { query: 'speech', mode: 'ranked' },
+    });
+  });
+
+  it('hydrates ranked hits with localized titles and thumbnail URLs', async () => {
+    const { service } = makeService({
+      videos: [
+        {
+          id: 'video-1',
+          slug: 'campaign-speech',
+          publishedAt: new Date('2026-01-01'),
+          uploaderVisible: true,
+          uploaderId: 'u1',
+          translations: [
+            { locale: 'si', title: 'කථාව', tagline: null, description: null },
+          ],
+          thumbnails: [
+            { bucket: 'thumbs', objectKey: 'speech.jpg', isSelected: true },
+          ],
+          uploader: { displayName: 'Creator', username: 'creator' },
+        },
+      ],
+    });
+
+    const result = await service.searchPublicVideos({ ...base, locale: 'si' });
+
+    expect(result?.items[0]).toEqual(
+      expect.objectContaining({
+        slug: 'campaign-speech',
+        title: 'කථාව',
+        uploader: 'Creator',
+        thumbnailUrl: 'https://storage.googleapis.com/thumbs/speech.jpg',
+      }),
+    );
+    expect(result?.searchMeta.mode).toBe('ranked');
   });
 });

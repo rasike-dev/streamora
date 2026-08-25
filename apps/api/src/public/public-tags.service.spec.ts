@@ -99,4 +99,71 @@ describe('PublicTagsService slug resolution (AC-10)', () => {
       NotFoundException,
     );
   });
+
+  it('returns published videos tagged with the resolved tag', async () => {
+    const prisma = {
+      tag: {
+        findFirst: jest.fn(async () => ({
+          id: 'tag-1',
+          slug: 'rallies',
+          status: 'ACTIVE',
+          mergedIntoTagId: null,
+        })),
+        findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(async () => ({
+          id: 'tag-1',
+          slug: 'rallies',
+          name: 'Rallies',
+          translations: [{ locale: 'en', name: 'Rallies', description: null }],
+        })),
+      },
+      tagAlias: { findUnique: jest.fn(async () => null) },
+      video: {
+        count: jest.fn(async () => 1),
+        findMany: jest.fn(async () => [
+          {
+            id: 'v1',
+            slug: 'opening-rally',
+            publishedAt: new Date('2026-01-01'),
+            uploaderVisible: true,
+            translations: [
+              {
+                locale: 'en',
+                title: 'Opening Rally',
+                description: null,
+                tagline: null,
+              },
+            ],
+            thumbnails: [
+              { bucket: 'thumbs', objectKey: 'rally.jpg', isSelected: true },
+            ],
+            uploader: { displayName: 'Campaign Team' },
+            channels: [
+              {
+                channel: {
+                  slug: 'rallies',
+                  name: 'Rallies',
+                  translations: [{ locale: 'en', name: 'Rallies' }],
+                },
+              },
+            ],
+          },
+        ]),
+      },
+    } as unknown as PrismaService;
+    const service = new PublicTagsService(prisma);
+
+    const result = await service.getTagBySlug('rallies', opts);
+
+    expect(result.pagination.total).toBe(1);
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        slug: 'opening-rally',
+        title: 'Opening Rally',
+        thumbnailUrl: 'https://storage.googleapis.com/thumbs/rally.jpg',
+        channel: { slug: 'rallies', name: 'Rallies' },
+        uploader: { displayName: 'Campaign Team' },
+      }),
+    );
+  });
 });

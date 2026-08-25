@@ -90,9 +90,37 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/*.spec.ts",
+      "!**/*.module.ts",
+      "!**/main.ts"
     ],
     "coverageDirectory": "../coverage",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "\\.module\\.ts$",
+      "main\\.ts$"
+    ],
+    "coverageThreshold": {
+      "**/common/taxonomy/**": {
+        "statements": 90,
+        "branches": 80,
+        "functions": 90,
+        "lines": 90
+      },
+      "**/taxonomy/**/*.service.ts": {
+        "statements": 75,
+        "branches": 55,
+        "functions": 65,
+        "lines": 75
+      },
+      "**/tags/**/*.service.ts": {
+        "statements": 55,
+        "branches": 35,
+        "functions": 45,
+        "lines": 55
+      }
+    },
     "testEnvironment": "node"
   }
 }
