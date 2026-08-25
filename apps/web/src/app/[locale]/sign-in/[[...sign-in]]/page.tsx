@@ -1,5 +1,6 @@
 import { SignIn } from "@clerk/nextjs";
 import { getTranslations } from "next-intl/server";
+import { BrandLogo } from "@/components/layout/brand-logo";
 import { PageFrame, PageHeading } from "@/components/layout";
 
 type PageProps = {
@@ -15,6 +16,7 @@ export default async function SignInPage({
 
   return (
     <PageFrame>
+      <BrandLogo variant="auth" className="mb-6" />
       <PageHeading
         title={tLogin("title")}
         description={tLogin("subtitle")}

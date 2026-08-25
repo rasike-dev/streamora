@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Streamora"
+    "name": "SLPoliNet"
   },
   "nav": {
     "login": "Login",
@@ -260,7 +260,7 @@
     "footerLogin": "Login",
     "footerTerms": "Terms",
     "footerPrivacy": "Privacy",
-    "footerCopyright": "© {year} Streamora. All rights reserved."
+    "footerCopyright": "© {year} {brand}. All rights reserved."
   },
   "legal": {
     "termsNav": "Terms of Service",

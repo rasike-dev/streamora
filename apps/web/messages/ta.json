@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Streamora"
+    "name": "SLPoliNet"
   },
   "nav": {
     "login": "உள்நுழைவு",
@@ -260,7 +260,7 @@
     "footerLogin": "உள்நுழைவு",
     "footerTerms": "விதிமுறைகள்",
     "footerPrivacy": "தனியுரிமை",
-    "footerCopyright": "© {year} Streamora. அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை."
+    "footerCopyright": "© {year} {brand}. அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை."
   },
   "legal": {
     "termsNav": "Terms of Service",

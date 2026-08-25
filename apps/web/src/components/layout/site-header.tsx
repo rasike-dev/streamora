@@ -4,11 +4,12 @@ import { LandingHeaderActions } from '@/components/landing-header-actions';
 import { AdminNavLink } from '@/components/layout/admin-nav-link';
 import { AuthNavLink } from '@/components/layout/auth-nav-link';
 import { CreatorNavLinks } from '@/components/layout/creator-nav-links';
+import { BrandLogo } from '@/components/layout/brand-logo';
+import { brand } from '@/lib/brand';
 
 export async function SiteHeader({ locale }: { locale: string }) {
   const t = await getTranslations({ locale, namespace: 'common' });
   const tNav = await getTranslations({ locale, namespace: 'nav' });
-  const tApp = await getTranslations({ locale, namespace: 'app' });
   const tTaxonomy = await getTranslations({ locale, namespace: 'taxonomy' });
 
   const navBtn =
@@ -16,14 +17,15 @@ export async function SiteHeader({ locale }: { locale: string }) {
 
   return (
     <header className="border-b border-black/10 dark:border-white/10">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:py-4">
         <Link
           href={`/${locale}`}
-          className="text-lg font-semibold tracking-tight shrink-0"
+          className="min-w-0 shrink-0 transition opacity-90 hover:opacity-100"
+          aria-label={brand.name}
         >
-          {tApp('name')}
+          <BrandLogo variant="header" priority />
         </Link>
-        <nav className="flex flex-1 flex-wrap items-center justify-end gap-2 sm:gap-3">
+        <nav className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 sm:gap-2 md:gap-3">
           <Link
             href={`/${locale}/videos`}
             className="text-sm font-medium text-muted-foreground transition hover:text-foreground"

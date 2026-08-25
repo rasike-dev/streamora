@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { BrandLogo } from "@/components/layout/brand-logo";
 import { SiteHeader } from "@/components/layout/site-header";
+import { SiteFooter } from "@/components/layout/site-footer";
+import { brand, logoAssets } from "@/lib/brand";
 
 type PageProps = {
   params: Promise<{ locale: string }>;
@@ -16,6 +19,7 @@ export async function generateMetadata({
   const description = t("metaDescription");
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const canonical = `${appUrl.replace(/\/$/, "")}/${locale}`;
+  const ogImage = `${appUrl.replace(/\/$/, "")}${logoAssets.horizontal.src}`;
 
   return {
     title,
@@ -25,20 +29,20 @@ export async function generateMetadata({
       title,
       description,
       url: canonical,
-      siteName: "Streamora",
+      siteName: brand.name,
       type: "website",
       locale,
+      images: [{ url: ogImage, width: logoAssets.horizontal.width, height: logoAssets.horizontal.height, alt: brand.name }],
     },
-    twitter: { card: "summary_large_image", title, description },
+    twitter: { card: "summary_large_image", title, description, images: [ogImage] },
   };
 }
 
 export default async function HomePage({ params }: PageProps) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "landing" });
-  const year = new Date().getFullYear();
   const contactEmail =
-    process.env.NEXT_PUBLIC_CONTACT_EMAIL || "hello@streamora.app";
+    process.env.NEXT_PUBLIC_CONTACT_EMAIL || `hello@${brand.domain}`;
 
   const featureBlocks = [
     ["feature1Title", "feature1Body"],
@@ -57,8 +61,9 @@ export default async function HomePage({ params }: PageProps) {
     <div className="flex min-h-dvh flex-col">
       <SiteHeader locale={locale} />
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-12 sm:py-16">
-        <section className="mx-auto max-w-3xl text-center">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-10 sm:py-16">
+        <section className="mx-auto w-full max-w-3xl text-center">
+          <BrandLogo variant="hero" priority className="mb-8 sm:mb-10" />
           <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl">
             {t("heroTitle")}
           </h1>
@@ -126,27 +131,7 @@ export default async function HomePage({ params }: PageProps) {
         </section>
       </main>
 
-      <footer className="border-t border-black/10 py-8 dark:border-white/10">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:flex-row sm:items-center sm:justify-between">
-          <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-            <Link href={`/${locale}/videos`} className="transition hover:text-foreground">
-              {t("footerBrowse")}
-            </Link>
-            <Link href={`/${locale}/sign-in`} className="transition hover:text-foreground">
-              {t("footerLogin")}
-            </Link>
-            <Link href={`/${locale}/legal/terms`} className="transition hover:text-foreground">
-              {t("footerTerms")}
-            </Link>
-            <Link href={`/${locale}/legal/privacy`} className="transition hover:text-foreground">
-              {t("footerPrivacy")}
-            </Link>
-          </nav>
-          <p className="text-xs text-muted-foreground">
-            {t("footerCopyright", { year })}
-          </p>
-        </div>
-      </footer>
+      <SiteFooter locale={locale} />
     </div>
   );
 }
