@@ -8,6 +8,7 @@ import { promisify } from "util";
 import fs from "fs/promises";
 import { readFileSync } from "fs";
 import os from "os";
+import http from "http";
 
 /** Load apps/worker/.env before GCP clients are constructed (cwd-independent). */
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
@@ -428,7 +429,20 @@ async function verifySubscriptionExistsBestEffort(
   }
 }
 
+async function startHealthServer() {
+  const port = Number(process.env.PORT || 8080);
+  http
+    .createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("ok");
+    })
+    .listen(port, () => {
+      console.log(`Worker health server listening on :${port}`);
+    });
+}
+
 async function main() {
+  await startHealthServer();
   logIdentityFromCredentialsFile();
 
   const projectId = mustEnv("GCP_PROJECT_ID");

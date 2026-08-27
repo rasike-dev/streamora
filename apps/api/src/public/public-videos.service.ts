@@ -179,6 +179,10 @@ export class PublicVideosService {
     const where: any = {
       status: 'PUBLISHED',
       visibility: 'PUBLIC',
+      OR: [
+        { sourceType: 'UPLOAD' },
+        { externalEmbed: { validationStatus: 'ACTIVE' } },
+      ],
     };
 
     if (q) {
@@ -381,6 +385,7 @@ export class PublicVideosService {
       select: {
         id: true,
         slug: true,
+        sourceType: true,
         status: true,
         visibility: true,
         uploaderVisible: true,
@@ -406,6 +411,17 @@ export class PublicVideosService {
             hlsBucket: true,
             hlsMasterKey: true,
             durationSec: true,
+          },
+        },
+        externalEmbed: {
+          select: {
+            embedUrl: true,
+            embedWidth: true,
+            embedHeight: true,
+            oEmbedThumbnailUrl: true,
+            validationStatus: true,
+            provider: true,
+            canonicalUrl: true,
           },
         },
         thumbnails: {
@@ -443,6 +459,39 @@ export class PublicVideosService {
 
     const translation = this.pickTranslation(video.translations, locale);
     const asset = video.asset;
+    const external = video.externalEmbed;
+
+    if (external) {
+      if (external.validationStatus !== 'ACTIVE') {
+        throw new NotFoundException('Video not found');
+      }
+
+      let uploader: { displayName: string } | null = null;
+      if (video.uploaderVisible && video.uploaderId) {
+        const profile = await this.prisma.creatorProfile.findUnique({
+          where: { userId: video.uploaderId },
+        });
+        if (profile?.approval === 'APPROVED' && video.uploader?.displayName) {
+          uploader = { displayName: video.uploader.displayName };
+        }
+      }
+
+      return {
+        id: video.id,
+        slug: video.slug,
+        sourceType: 'EXTERNAL_EMBED',
+        title: translation.title,
+        description: translation.description,
+        tagline: translation.tagline,
+        externalEmbed: external,
+        thumbnailUrl: external.oEmbedThumbnailUrl ?? null,
+        durationSeconds: null,
+        uploader,
+        canonicalUrl: `/${locale}/v/${video.slug}`,
+        embedUrl: `/${locale}/embed/${video.slug}`,
+        subtitles: [],
+      };
+    }
 
     if (!asset?.hlsBucket || !asset?.hlsMasterKey) {
       throw new NotFoundException('Video asset not found');
@@ -462,6 +511,7 @@ export class PublicVideosService {
     return {
       id: video.id,
       slug: video.slug,
+      sourceType: 'UPLOAD',
       title: translation.title,
       description: translation.description,
       tagline: translation.tagline,

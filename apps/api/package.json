@@ -19,9 +19,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "prisma": "prisma",
-    "prisma:migrate": "prisma migrate",
-    "prisma:generate": "prisma generate",
+    "prisma": "dotenv -e ../../.env -- prisma",
+    "prisma:migrate": "dotenv -e ../../.env -- prisma migrate",
+    "prisma:generate": "dotenv -e ../../.env -- prisma generate",
     "tag:duplicates": "dotenv -e ../../.env -- ts-node prisma/scripts/tag-duplicate-report.ts"
   },
   "prisma": {

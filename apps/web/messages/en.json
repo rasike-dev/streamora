@@ -74,7 +74,16 @@
     "intro": "Select a file and fill in metadata. Drafts can be edited before publishing.",
     "alsoUploadMedia": "Need to share an image or document instead?",
     "uploadMediaLink": "Go to image & document upload",
+    "alsoEmbedExternal": "Linking a video on YouTube, Facebook, or Vimeo?",
+    "embedExternalLink": "Add external video embed",
     "envMissing": "Sign-in is not configured. Set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY."
+  },
+  "externalUploadPage": {
+    "title": "External video",
+    "description": "Embed a video hosted on another platform.",
+    "intro": "Paste a public video URL or iframe code. We validate the link and periodically re-check that it is still available.",
+    "alsoUploadFile": "Need to upload your own file instead?",
+    "uploadFileLink": "Go to file upload"
   },
   "mediaBrowsePage": {
     "title": "Discover media",
@@ -153,7 +162,10 @@
     "byAuthor": "By {name}",
     "notFoundTitle": "Video not found",
     "notFoundBody": "It may have been removed or the link is incorrect.",
-    "loadError": "Couldn't load this video."
+    "loadError": "Couldn't load this video.",
+    "playbackUnavailable": "Playback is not available for this video.",
+    "externalUnavailable": "This video is no longer available at the source.",
+    "externalUnavailableHint": "The original platform removed or restricted this video. It has been hidden from browse results."
   },
   "watchPage": {
     "title": "Watch",

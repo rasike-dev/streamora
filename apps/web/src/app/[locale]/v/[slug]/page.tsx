@@ -8,6 +8,7 @@ import {
 } from "@/components/layout";
 import { SiteHeader } from "@/components/layout/site-header";
 import { PublicVideoPlayer } from "@/components/videos/PublicVideoPlayer";
+import { ExternalEmbedPlayer } from "@/components/videos/ExternalEmbedPlayer";
 import ShareActions from "@/components/share-actions";
 
 type PageProps = {
@@ -179,14 +180,37 @@ export default async function VideoSharePage({
             </p>
           ) : null}
 
-          <PublicVideoPlayer
-            videoId={video.id}
-            playbackUrl={video.playbackUrl}
-            posterUrl={video.thumbnailUrl}
-            locale={locale}
-            trafficSource={trafficSource as any}
-            subtitles={video.subtitles || []}
-          />
+          {video.playbackUrl ? (
+            <PublicVideoPlayer
+              videoId={video.id}
+              playbackUrl={video.playbackUrl}
+              posterUrl={video.thumbnailUrl}
+              locale={locale}
+              trafficSource={trafficSource as any}
+              subtitles={video.subtitles || []}
+            />
+          ) : video.externalEmbed ? (
+            <ExternalEmbedPlayer
+              embedUrl={video.externalEmbed.embedUrl}
+              title={video.title || t("untitled")}
+              width={video.externalEmbed.embedWidth}
+              height={video.externalEmbed.embedHeight}
+              validationStatus={video.externalEmbed.validationStatus}
+              canonicalUrl={video.externalEmbed.canonicalUrl}
+              unavailableMessage={t("externalUnavailable")}
+            />
+          ) : (
+            <div className={`${metaSurface} text-sm text-muted-foreground`}>
+              {t("playbackUnavailable")}
+            </div>
+          )}
+
+          {video.sourceType === "EXTERNAL_EMBED" &&
+          video.externalEmbed?.validationStatus === "UNAVAILABLE" ? (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+              {t("externalUnavailableHint")}
+            </p>
+          ) : null}
 
           {video.description ? (
             <div className={`mt-4 ${metaSurface}`}>

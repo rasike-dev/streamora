@@ -30,6 +30,15 @@ export default async function UploadPage({ params }: PageProps) {
           {t('uploadMediaLink')}
         </Link>
       </div>
+      <div className="mb-6 rounded-2xl border border-black/10 bg-black/[0.02] p-4 text-sm dark:border-white/10 dark:bg-white/[0.04]">
+        <p className="text-muted-foreground">{t('alsoEmbedExternal')}</p>
+        <Link
+          href={`/${locale}/upload/external`}
+          className="mt-2 inline-flex font-medium underline underline-offset-2"
+        >
+          {t('embedExternalLink')}
+        </Link>
+      </div>
       <UploadManager locale={locale} />
     </PageFrame>
   );

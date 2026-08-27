@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatorVideosQueryService } from './creator-videos-query.service';
 import { ContentTaxonomyService } from '../taxonomy/content-taxonomy.service';
 import { TagsService } from '../tags/tags.service';
+import { ExternalEmbedService } from '../external-embed/external-embed.service';
 
 @Injectable()
 export class VideosService {
@@ -16,6 +17,7 @@ export class VideosService {
     private queryService: CreatorVideosQueryService,
     private contentTaxonomy: ContentTaxonomyService,
     private tags: TagsService,
+    private externalEmbedService: ExternalEmbedService,
   ) {}
 
   async createDraft(
@@ -272,9 +274,11 @@ export class VideosService {
         updatedAt: true,
         primaryChannelId: true,
         primaryChannel: { select: { slug: true } },
+        sourceType: true,
         translations: true,
         channels: { include: { channel: true } },
         tags: { include: { tag: true } },
+        externalEmbed: true,
       },
     });
 
@@ -434,6 +438,7 @@ export class VideosService {
 
     const video = await this.prisma.video.findFirst({
       where: { id: videoId, uploaderId: user.id },
+      include: { externalEmbed: true },
     });
 
     if (!video) {
@@ -446,6 +451,11 @@ export class VideosService {
         'Video must be READY to submit for moderation',
       );
     }
+
+    this.externalEmbedService.assertSubmittable(
+      video.sourceType,
+      video.externalEmbed,
+    );
 
     await this.prisma.video.update({
       where: { id: videoId },

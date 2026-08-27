@@ -6,9 +6,16 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { SearchModule } from '../search/search.module';
 import { TaxonomyModule } from '../taxonomy/taxonomy.module';
 import { TagsModule } from '../tags/tags.module';
+import { ExternalEmbedModule } from '../external-embed/external-embed.module';
 
 @Module({
-  imports: [PrismaModule, SearchModule, TaxonomyModule, TagsModule],
+  imports: [
+    PrismaModule,
+    SearchModule,
+    TaxonomyModule,
+    TagsModule,
+    ExternalEmbedModule,
+  ],
   controllers: [VideosController],
   providers: [VideosService, CreatorVideosQueryService],
   exports: [VideosService],

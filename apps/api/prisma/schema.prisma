@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -37,6 +38,25 @@ enum VideoVisibility {
   PUBLIC
   UNLISTED
   PRIVATE
+}
+
+enum VideoSourceType {
+  UPLOAD
+  EXTERNAL_EMBED
+}
+
+enum ExternalEmbedProvider {
+  YOUTUBE
+  FACEBOOK
+  VIMEO
+  OTHER
+}
+
+enum ExternalEmbedValidationStatus {
+  PENDING
+  ACTIVE
+  UNAVAILABLE
+  ERROR
 }
 
 enum VideoAnalyticsEventType {
@@ -327,6 +347,7 @@ model TagTranslation {
 model Video {
   id                String          @id @default(cuid())
   slug              String          @unique
+  sourceType        VideoSourceType @default(UPLOAD)
   status            VideoStatus     @default(DRAFT)
   visibility        VideoVisibility @default(PRIVATE)
   publishAt         DateTime?
@@ -381,12 +402,37 @@ model Video {
   shortLinks      ShortLink[]
   auditLogs       VideoAuditLog[]
   subtitles       VideoSubtitle[]
+  externalEmbed   VideoExternalEmbed?
 
   @@index([status])
   @@index([visibility])
   @@index([publishAt])
   @@index([uploaderId])
   @@index([primaryChannelId])
+  @@index([sourceType])
+}
+
+model VideoExternalEmbed {
+  id                   String                        @id @default(cuid())
+  videoId              String                        @unique
+  provider             ExternalEmbedProvider
+  canonicalUrl         String
+  embedUrl             String
+  embedWidth           Int?
+  embedHeight          Int?
+  oEmbedThumbnailUrl   String?
+  validationStatus     ExternalEmbedValidationStatus @default(PENDING)
+  lastValidatedAt      DateTime?
+  nextValidationAt     DateTime?
+  lastValidationError  String?
+  unavailableSince     DateTime?
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([validationStatus, nextValidationAt])
+  @@index([provider])
 }
 
 model VideoTranslation {

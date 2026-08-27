@@ -6,6 +6,10 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  images: {
+    // Cloud Run standalone: avoid /_next/image (sharp + filesystem tracing issues)
+    unoptimized: true,
+  },
   env: {
     // Next.js will automatically load .env.local from root
     // But we can also explicitly load from root .env

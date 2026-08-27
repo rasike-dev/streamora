@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 FROM node:20-bookworm-slim AS base
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@10.26.0 --activate
 WORKDIR /app
 
 FROM base AS deps
@@ -17,17 +17,18 @@ COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_module
 COPY . .
 RUN pnpm --filter api exec prisma generate
 RUN pnpm --filter api build
+RUN pnpm deploy --filter=api --prod --legacy /prod/api
+RUN cp -r apps/api/dist /prod/api/dist
+RUN PRISMA_SRC="$(find /app -type d -path '*/node_modules/.prisma' | head -1)" && \
+    PRISMA_DEST="$(find /prod/api/node_modules/.pnpm -type d -path '*/@prisma+client*/node_modules' | head -1)" && \
+    cp -r "$PRISMA_SRC" "$PRISMA_DEST/.prisma"
 
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-RUN corepack enable
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/package.json ./package.json
-COPY --from=builder /app/apps/api/prisma ./prisma
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/api/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /prod/api ./
 
 EXPOSE 3001
 CMD ["node", "dist/main.js"]

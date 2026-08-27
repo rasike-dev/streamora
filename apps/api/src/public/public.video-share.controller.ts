@@ -27,6 +27,7 @@ export class PublicVideoShareController {
       include: {
         translations: true,
         uploader: true,
+        externalEmbed: true,
         channels: {
           include: {
             channel: {
@@ -95,7 +96,7 @@ export class PublicVideoShareController {
       ? cdnBase
         ? `${cdnBase}/${thumb.objectKey}`
         : `https://storage.googleapis.com/${thumb.bucket}/${thumb.objectKey}`
-      : null;
+      : v.externalEmbed?.oEmbedThumbnailUrl ?? null;
 
     // Breadcrumb comes from the primary channel; videos that predate the
     // taxonomy simply have no trail rather than a guessed one.
@@ -113,6 +114,7 @@ export class PublicVideoShareController {
     return {
       id: v.id,
       slug: v.slug,
+      sourceType: v.sourceType,
       title: t?.title ?? null,
       description: t?.description ?? null,
       tagline: t?.tagline ?? null,
@@ -121,6 +123,18 @@ export class PublicVideoShareController {
       createdAt: v.createdAt,
       playbackUrl: masterUrl,
       thumbnailUrl: thumbUrl,
+      externalEmbed: v.externalEmbed
+        ? {
+            provider: v.externalEmbed.provider,
+            embedUrl: v.externalEmbed.embedUrl,
+            canonicalUrl: v.externalEmbed.canonicalUrl,
+            embedWidth: v.externalEmbed.embedWidth,
+            embedHeight: v.externalEmbed.embedHeight,
+            validationStatus: v.externalEmbed.validationStatus,
+            lastValidatedAt: v.externalEmbed.lastValidatedAt,
+            unavailableSince: v.externalEmbed.unavailableSince,
+          }
+        : null,
       breadcrumb,
       channels: v.channels.map((c) => ({
         slug: c.channel.slug,

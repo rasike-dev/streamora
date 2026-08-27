@@ -106,6 +106,7 @@ function makeService(videoStatus = 'READY') {
     {} as CreatorVideosQueryService,
     new ContentTaxonomyService(prisma),
     new TagsService(prisma),
+    { assertSubmittable: jest.fn() } as any,
   );
 
   return { service, video, writes, prisma };

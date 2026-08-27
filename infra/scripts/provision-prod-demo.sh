@@ -78,7 +78,7 @@ else
     --project="$PROJECT_ID"
 fi
 
-DATABASE_URL="postgresql://streamora:${DB_PASSWORD}@/streamora?host=/cloudsql/${CONNECTION_NAME}"
+DATABASE_URL="postgresql://streamora:${DB_PASSWORD}@localhost/streamora?host=/cloudsql/${CONNECTION_NAME}"
 
 echo "=== GCS buckets (slpolinet-*-prod) ==="
 for BUCKET in slpolinet-originals-prod slpolinet-thumbs-prod slpolinet-renditions-prod; do

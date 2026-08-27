@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { getPublicEmbedVideo } from '@/lib/api/public-embed';
 import { PublicVideoPlayer } from '@/components/videos/PublicVideoPlayer';
+import { ExternalEmbedPlayer } from '@/components/videos/ExternalEmbedPlayer';
 
 type PageProps = {
   params: Promise<{
@@ -76,14 +77,25 @@ export default async function EmbedVideoPage(props: PageProps) {
     <main className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-5xl">
         <div className="aspect-video w-full bg-black">
-          <PublicVideoPlayer
-            videoId={video.id}
-            playbackUrl={video.hlsUrl}
-            posterUrl={video.thumbnailUrl}
-            locale={params.locale}
-            trafficSource="EXTERNAL"
-            subtitles={video.subtitles || []}
-          />
+          {video.hlsUrl ? (
+            <PublicVideoPlayer
+              videoId={video.id}
+              playbackUrl={video.hlsUrl}
+              posterUrl={video.thumbnailUrl}
+              locale={params.locale}
+              trafficSource="EXTERNAL"
+              subtitles={video.subtitles || []}
+            />
+          ) : video.externalEmbed ? (
+            <ExternalEmbedPlayer
+              embedUrl={video.externalEmbed.embedUrl}
+              title={video.title}
+              width={video.externalEmbed.embedWidth}
+              height={video.externalEmbed.embedHeight}
+              validationStatus={video.externalEmbed.validationStatus}
+              canonicalUrl={video.externalEmbed.canonicalUrl}
+            />
+          ) : null}
         </div>
 
         <div className="space-y-2 px-4 py-3 bg-neutral-950">

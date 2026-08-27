@@ -41,11 +41,13 @@ COMMON_API_ENV+=",PUBSUB_TOPIC_MEDIA_UPLOADED=media.uploaded"
 COMMON_API_ENV+=",CLERK_JWT_AUDIENCE=streamora-api"
 
 # Demo: use dev Clerk issuer until production Clerk is configured
-CLERK_ISSUER="${CLERK_JWT_ISSUER:-https://in-hippo-5893.clerk.accounts.dev}"
+CLERK_ISSUER="${CLERK_JWT_ISSUER:-https://clerk.slpolinet.com}"
+[[ "$ENV" != "prod" ]] && CLERK_ISSUER="${CLERK_JWT_ISSUER:-https://in-hippo-5893.clerk.accounts.dev}"
 COMMON_API_ENV+=",CLERK_JWT_ISSUER=${CLERK_ISSUER}"
 COMMON_API_ENV+=",CLERK_JWKS_URL=${CLERK_ISSUER%/}/.well-known/jwks.json"
 
-ALLOWED="${ALLOWED_ORIGINS:-https://slpolinet.com,http://localhost:3000}"
+ALLOWED="${ALLOWED_ORIGINS:-https://slpolinet.com}"
+[[ "$ENV" != "prod" ]] && ALLOWED="${ALLOWED_ORIGINS:-http://localhost:3000}"
 UPLOAD_ORIGIN="${UPLOAD_RESUMABLE_ORIGIN:-https://slpolinet.com}"
 COMMON_API_ENV+=",ALLOWED_ORIGINS=${ALLOWED}"
 COMMON_API_ENV+=",UPLOAD_RESUMABLE_ORIGIN=${UPLOAD_ORIGIN}"
@@ -98,6 +100,7 @@ gcloud run deploy "streamora-worker-${ENV}" \
   --region="$REGION" \
   --platform=managed \
   --no-allow-unauthenticated \
+  --port=8080 \
   --min-instances="$WORKER_MIN" \
   --max-instances=2 \
   --memory="$WORKER_MEM" \

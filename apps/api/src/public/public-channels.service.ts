@@ -56,6 +56,10 @@ export class PublicChannelsService {
     const where = {
       status: 'PUBLISHED' as const,
       visibility: 'PUBLIC' as const,
+      OR: [
+        { sourceType: 'UPLOAD' as const },
+        { externalEmbed: { validationStatus: 'ACTIVE' as const } },
+      ],
       channels: {
         some: {
           channelId: channel.id,

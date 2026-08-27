@@ -1,10 +1,19 @@
 export type PublicEmbedVideo = {
   id: string;
   slug: string;
+  sourceType?: 'UPLOAD' | 'EXTERNAL_EMBED';
   title: string;
   description: string | null;
   tagline: string | null;
-  hlsUrl: string;
+  hlsUrl?: string;
+  externalEmbed?: {
+    provider: string;
+    embedUrl: string;
+    canonicalUrl: string;
+    embedWidth?: number | null;
+    embedHeight?: number | null;
+    validationStatus: string;
+  } | null;
   thumbnailUrl: string | null;
   durationSeconds: number | null;
   uploader: {

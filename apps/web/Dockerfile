@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 FROM node:20-bookworm-slim AS base
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@10.26.0 --activate
 WORKDIR /app
 
 FROM base AS deps
@@ -27,9 +27,13 @@ FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+RUN apt-get update && apt-get install -y --no-install-recommends libvips42 \
+  && rm -rf /var/lib/apt/lists/* \
+  && npm install --os=linux --cpu=x64 sharp@0.33.5
+
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder /app/apps/web/public ./apps/web/public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 

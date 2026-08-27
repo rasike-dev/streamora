@@ -130,6 +130,13 @@ export class SearchService {
           ON vt_en."videoId" = v.id AND vt_en.locale = 'en'
         WHERE v.status = 'PUBLISHED'
           AND v.visibility = 'PUBLIC'
+          AND (
+            v."sourceType" = 'UPLOAD'
+            OR EXISTS (
+              SELECT 1 FROM "VideoExternalEmbed" ee
+              WHERE ee."videoId" = v.id AND ee."validationStatus" = 'ACTIVE'
+            )
+          )
           ${filterClauses}
       )
       SELECT
@@ -196,6 +203,13 @@ export class SearchService {
           ON vt_en."videoId" = v.id AND vt_en.locale = 'en'
         WHERE v.status = 'PUBLISHED'
           AND v.visibility = 'PUBLIC'
+          AND (
+            v."sourceType" = 'UPLOAD'
+            OR EXISTS (
+              SELECT 1 FROM "VideoExternalEmbed" ee
+              WHERE ee."videoId" = v.id AND ee."validationStatus" = 'ACTIVE'
+            )
+          )
           ${filterClauses}
       )
       SELECT COUNT(*)::int AS count

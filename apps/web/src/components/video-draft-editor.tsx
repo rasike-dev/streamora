@@ -15,9 +15,10 @@ import { VideoVisibilitySelector } from "@/components/videos/VideoVisibilitySele
 import { VideoScheduleEditor } from "@/components/videos/VideoScheduleEditor";
 import { CopyShareLinkButton } from "@/components/CopyShareLinkButton";
 import { CopyEmbedCodeButton } from "@/components/CopyEmbedCodeButton";
+import { ExternalEmbedPanel } from "@/components/external-embed-panel";
 import { resubmitCreatorVideo } from "@/lib/api/creator-videos";
-import { apiFetch } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth/tokens";
+import { useAuth } from "@clerk/nextjs";
+import { apiFetch, readApiError } from "@/lib/api";
 import Link from "next/link";
 
 type Translation = {
@@ -34,6 +35,7 @@ type VideoDraft = {
   id: string;
   slug: string;
   status: string;
+  sourceType?: string;
   visibility: string;
   scheduledAt?: string | null;
   scheduleRequested?: boolean;
@@ -54,6 +56,15 @@ type VideoDraft = {
   channels: Array<{ channel: { slug: string; name: string } }>;
   primaryChannel?: { slug: string } | null;
   tags: Array<{ tag: { slug: string; name: string } }>;
+  externalEmbed?: {
+    provider: string;
+    canonicalUrl: string;
+    embedUrl: string;
+    validationStatus: string;
+    lastValidatedAt?: string | null;
+    lastValidationError?: string | null;
+    unavailableSince?: string | null;
+  } | null;
 };
 
 const MAX_TAGS_PER_VIDEO = 15;
@@ -62,7 +73,7 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
   const api = process.env.NEXT_PUBLIC_API_URL!;
   const params = useParams();
   const locale = propLocale || (params.locale as string) || "en";
-  const token = getAccessToken();
+  const { isLoaded, isSignedIn } = useAuth();
 
   const [video, setVideo] = useState<VideoDraft | null>(null);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -86,11 +97,14 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
   const [isResubmitting, setIsResubmitting] = useState(false);
 
   useEffect(() => {
-    if (!token) return;
+    if (!isLoaded || !isSignedIn) return;
 
     // Load video draft
     apiFetch(`/creator/videos/${videoId}`, { cache: "no-store" })
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) throw new Error(await readApiError(r));
+        return r.json();
+      })
       .then((data) => {
         setVideo(data);
 
@@ -145,7 +159,7 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
       .then((r) => r.json())
       .then(setTags)
       .catch(() => {});
-  }, [api, videoId, token, locale]);
+  }, [api, videoId, locale, isLoaded, isSignedIn]);
 
   const unmappedChannels = useMemo(() => {
     const mapped = new Set(
@@ -186,7 +200,7 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
   };
 
   const saveDraft = async () => {
-    if (!token) {
+    if (!isSignedIn) {
       setMessage("Not logged in");
       return;
     }
@@ -232,7 +246,7 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
   };
 
   const submitForModeration = async () => {
-    if (!token) {
+    if (!isSignedIn) {
       setMessage("Not logged in");
       return;
     }
@@ -275,10 +289,16 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
   const editable = ["DRAFT", "UPLOADED", "PROCESSING_FAILED", "READY", "REJECTED"].includes(
     video.status
   );
-  const canSubmit = video.status === "READY";
+  const canSubmit =
+    video.status === "READY" &&
+    (video.sourceType !== "EXTERNAL_EMBED" ||
+      video.externalEmbed?.validationStatus === "ACTIVE");
   const submitDisabledReason =
     video.status === "READY"
-      ? ""
+      ? video.sourceType === "EXTERNAL_EMBED" &&
+        video.externalEmbed?.validationStatus !== "ACTIVE"
+        ? "External link must pass validation before submission."
+        : ""
       : `Submit is available only when status is READY. Current status: ${video.status}.`;
 
   const currentTranslation = formData[activeLocale] || formData.en;
@@ -301,6 +321,19 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
           {message}
         </div>
       )}
+
+      {video.sourceType === "EXTERNAL_EMBED" && video.externalEmbed ? (
+        <ExternalEmbedPanel
+          videoId={video.id}
+          externalEmbed={video.externalEmbed}
+          onUpdated={() => {
+            apiFetch(`/creator/videos/${videoId}`, { cache: "no-store" })
+              .then((r) => r.json())
+              .then(setVideo)
+              .catch(() => {});
+          }}
+        />
+      ) : null}
 
       {video?.status === "REJECTED" && (
         <div className="space-y-4">
@@ -328,7 +361,7 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
 
           <button
             onClick={async () => {
-              if (!token || !video) return;
+              if (!isSignedIn || !video) return;
               try {
                 setIsResubmitting(true);
                 setMessage("");
@@ -348,7 +381,7 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
                 setIsResubmitting(false);
               }
             }}
-            disabled={isResubmitting || !token}
+            disabled={isResubmitting || !isSignedIn}
             className="rounded-xl bg-black px-4 py-2 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-800"
           >
             {isResubmitting ? "Resubmitting..." : "Resubmit for Approval"}

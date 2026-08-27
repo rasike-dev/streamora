@@ -69,6 +69,7 @@ import { PublicMediaController } from './public/public-media.controller';
 import { PublicMediaService } from './public/public-media.service';
 import { MediaShortLinksController } from './short-links/media-short-links.controller';
 import { MediaShortLinksService } from './short-links/media-short-links.service';
+import { ExternalEmbedModule } from './external-embed/external-embed.module';
 import { rateLimitConfig } from './common/rate-limit.config';
 
 @Module({
@@ -85,6 +86,7 @@ import { rateLimitConfig } from './common/rate-limit.config';
     TagsModule,
     TaxonomyModule,
     VideosModule,
+    ExternalEmbedModule,
     SearchModule,
   ],
   controllers: [
