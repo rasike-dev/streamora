@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { brand, logoAssets } from "@/lib/brand";
 
-export type BrandLogoVariant = "header" | "hero" | "footer" | "auth" | "mark" | "dashboard";
+export type BrandLogoVariant = "header" | "hero" | "footer" | "auth" | "mark";
 
 type BrandLogoProps = {
   variant?: BrandLogoVariant;
@@ -248,19 +248,5 @@ export function BrandLogo({
     );
   }
 
-  // dashboard — prominent lockup below site header
-  return (
-    <div className={`flex w-full items-center justify-center ${className ?? ""}`}>
-      <span className={wrapClass("w-full max-w-3xl", true)}>
-        <HorizontalImage
-          asset={logoAssets.horizontal}
-          maxWidthClass="w-full"
-          widthFirst
-          priority={priority}
-          sizes="(min-width: 768px) 768px, 640px"
-          crisp
-        />
-      </span>
-    </div>
-  );
+  return null;
 }
