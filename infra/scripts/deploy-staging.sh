@@ -5,7 +5,7 @@
 #
 # Demo/cheap defaults (DEMO_CHEAP=true):
 #   - scale-to-zero for web + API (cold starts OK for demos)
-#   - worker: 512Mi / 1 CPU (override with WORKER_MIN_INSTANCES=1 if you need always-on processing)
+#   - worker stays at min 1 (pull Pub/Sub subscription; scale-to-zero drops uploads)
 #   - native Cloud SQL socket (no VPC connector billing)
 set -euo pipefail
 
@@ -22,7 +22,8 @@ gcloud config set project "$PROJECT_ID"
 
 API_MIN="${API_MIN_INSTANCES:-0}"
 WEB_MIN="${WEB_MIN_INSTANCES:-0}"
-WORKER_MIN="${WORKER_MIN_INSTANCES:-0}"
+# Pull-based Pub/Sub worker must stay warm or video.uploaded messages are never consumed.
+WORKER_MIN="${WORKER_MIN_INSTANCES:-1}"
 if [[ "$DEMO_CHEAP" != "true" ]]; then
   API_MIN="${API_MIN_INSTANCES:-1}"
   WORKER_MIN="${WORKER_MIN_INSTANCES:-1}"

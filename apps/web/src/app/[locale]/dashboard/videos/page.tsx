@@ -12,7 +12,7 @@ import {
 } from "@/components/layout";
 import { getCreatorVideos, reprocessCreatorVideo } from "@/lib/api/creator-videos";
 
-const REPROCESSABLE = ["DRAFT", "UPLOADED", "PROCESSING_FAILED"];
+const REPROCESSABLE = ["DRAFT", "UPLOADED", "PROCESSING", "PROCESSING_FAILED"];
 
 const surface =
   "rounded-2xl border border-black/10 bg-black/[0.02] p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.04]";
@@ -50,13 +50,15 @@ export default function CreatorVideosPage() {
     setNotice(null);
     try {
       await reprocessCreatorVideo(videoId);
-      setNotice("Processing started ✅ This video will become READY shortly.");
+      setNotice(
+        "Processing queued. The worker will transcode this video to READY — refresh in a minute.",
+      );
       setData((prev: any) =>
         prev
           ? {
               ...prev,
               items: prev.items.map((v: any) =>
-                v.id === videoId ? { ...v, status: "PROCESSING" } : v,
+                v.id === videoId ? { ...v, status: "UPLOADED" } : v,
               ),
             }
           : prev,

@@ -2,12 +2,17 @@
 
 import { useState } from "react";
 import { updateVideoVisibility } from "@/lib/api/video-visibility";
+import {
+  isVisibilityEditable,
+  visibilityDisabledReason,
+} from "@/lib/video-editability";
 
 type Visibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
 type Props = {
   videoId: string;
   value: Visibility;
+  status: string;
   onUpdate?: () => void;
 };
 
@@ -33,12 +38,14 @@ const options: {
   },
 ];
 
-export function VideoVisibilitySelector({ videoId, value, onUpdate }: Props) {
+export function VideoVisibilitySelector({ videoId, value, status, onUpdate }: Props) {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canEdit = isVisibilityEditable(status);
+  const disabledReason = visibilityDisabledReason(status);
 
   const handleChange = async (newVisibility: Visibility) => {
-    if (newVisibility === value) return;
+    if (!canEdit || newVisibility === value) return;
 
     setUpdating(true);
     setError(null);
@@ -60,20 +67,26 @@ export function VideoVisibilitySelector({ videoId, value, onUpdate }: Props) {
         <p className="mt-1 text-xs text-muted-foreground">
           Control how people can access this video after publication.
         </p>
+        {!canEdit && disabledReason ? (
+          <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+            {disabledReason}
+          </p>
+        ) : null}
       </div>
 
-      <div className="space-y-2">
+      <div className={`space-y-2 ${!canEdit ? "opacity-60" : ""}`}>
         {options.map((option) => {
           const checked = value === option.value;
+          const optionDisabled = !canEdit || updating;
 
           return (
             <label
               key={option.value}
-              className={`block cursor-pointer rounded-xl border p-3 transition ${
+              className={`block rounded-xl border p-3 transition ${
                 checked
                   ? 'border-blue-500 ring-1 ring-blue-500 bg-blue-50 dark:bg-blue-900/20'
                   : 'hover:border-gray-400'
-              } ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
+              } ${optionDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
             >
               <div className="flex items-start gap-3">
                 <input
@@ -82,7 +95,7 @@ export function VideoVisibilitySelector({ videoId, value, onUpdate }: Props) {
                   className="mt-1"
                   checked={checked}
                   onChange={() => handleChange(option.value)}
-                  disabled={updating}
+                  disabled={optionDisabled}
                 />
                 <div className="flex-1">
                   <div className="text-sm font-medium">{option.title}</div>

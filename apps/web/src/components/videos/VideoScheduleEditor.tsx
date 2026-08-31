@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { updateVideoSchedule } from "@/lib/api/video-schedule";
+import {
+  isScheduleEditable,
+  scheduleDisabledReason,
+} from "@/lib/video-editability";
 
 type Props = {
   videoId: string;
@@ -31,10 +35,8 @@ export function VideoScheduleEditor({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const canEdit = useMemo(
-    () => ["DRAFT", "READY", "PENDING_APPROVAL", "APPROVED"].includes(status),
-    [status]
-  );
+  const canEdit = useMemo(() => isScheduleEditable(status), [status]);
+  const disabledReason = useMemo(() => scheduleDisabledReason(status), [status]);
 
   const handleSave = async () => {
     if (!value) {
@@ -82,9 +84,14 @@ export function VideoScheduleEditor({
         <p className="mt-1 text-xs text-muted-foreground">
           Pick a future date and time. The video will publish automatically after approval.
         </p>
+        {!canEdit && disabledReason ? (
+          <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+            {disabledReason}
+          </p>
+        ) : null}
       </div>
 
-      <div className="space-y-3">
+      <div className={`space-y-3 ${!canEdit ? "opacity-60" : ""}`}>
         <input
           type="datetime-local"
           value={value}

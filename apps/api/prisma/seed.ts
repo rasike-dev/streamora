@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { TAXONOMY_SEED } from './data/taxonomy-seed';
+import { CHANNEL_SEED } from './data/channel-seed';
 import { normalizeTagName } from '../src/common/taxonomy/normalize.util';
 
 const prisma = new PrismaClient();
@@ -94,6 +95,67 @@ async function seedTaxonomy() {
 }
 
 /**
+ * Sample channels mapped into Category > Subcategory so creators can see how
+ * the hierarchy works. Re-running refreshes names, sort order and mapping.
+ */
+async function seedSampleChannels() {
+  let mapped = 0;
+
+  for (const channel of CHANNEL_SEED) {
+    const subcategory = await prisma.subcategory.findFirst({
+      where: {
+        slug: channel.subcategorySlug,
+        category: { slug: channel.categorySlug },
+      },
+    });
+
+    if (!subcategory) {
+      console.warn(
+        `Skipping channel ${channel.slug}: ${channel.categorySlug}/${channel.subcategorySlug} not found`,
+      );
+      continue;
+    }
+
+    const record = await prisma.channel.upsert({
+      where: { slug: channel.slug },
+      update: {
+        name: channel.name,
+        sortOrder: channel.sortOrder,
+        subcategoryId: subcategory.id,
+      },
+      create: {
+        name: channel.name,
+        slug: channel.slug,
+        sortOrder: channel.sortOrder,
+        subcategoryId: subcategory.id,
+        isActive: true,
+      },
+    });
+
+    for (const translation of channel.translations) {
+      await prisma.channelTranslation.upsert({
+        where: {
+          channelId_locale: {
+            channelId: record.id,
+            locale: translation.locale,
+          },
+        },
+        update: { name: translation.name },
+        create: {
+          channelId: record.id,
+          locale: translation.locale,
+          name: translation.name,
+        },
+      });
+    }
+
+    mapped++;
+  }
+
+  return mapped;
+}
+
+/**
  * Demo channels and tags kept from the original seed.
  *
  * These channels are intentionally left without a subcategory so the admin
@@ -177,16 +239,18 @@ async function seedDemoContent() {
 
 async function main() {
   const taxonomy = await seedTaxonomy();
+  const mappedChannels = await seedSampleChannels();
   const demo = await seedDemoContent();
 
   console.log(
     `Seeded taxonomy: ${taxonomy.categories} categories, ${taxonomy.subcategories} subcategories`,
   );
+  console.log(`Seeded ${mappedChannels} mapped sample channels`);
   console.log(
     `Seeded demo content: channels ${demo.channel1.slug}, ${demo.channel2.slug}; tags ${demo.tag1.slug}, ${demo.tag2.slug}`,
   );
   console.log(
-    'Demo channels are intentionally unmapped - assign them under /admin/taxonomy.',
+    'Demo channels technology/education stay unmapped — assign them under /admin/taxonomy.',
   );
 }
 

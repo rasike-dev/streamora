@@ -106,7 +106,14 @@ export function ChannelTaxonomyPicker({
   const available = subcategory?.channels ?? [];
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4 rounded-2xl border border-black/10 bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.02]">
+      <div>
+        <h3 className="text-sm font-semibold">{t("channels")}</h3>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          {t("channelTaxonomyIntro")}
+        </p>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-sm">
           <span className="mb-1 block font-medium">{t("category")}</span>
@@ -148,7 +155,15 @@ export function ChannelTaxonomyPicker({
 
       {subcategory ? (
         <div className="space-y-2">
-          <div className="text-sm font-medium">{t("availableChannels")}</div>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="text-sm font-medium">{t("availableChannels")}</div>
+            <p className="text-xs text-muted-foreground">
+              {t("channelTaxonomyBreadcrumb", {
+                category: category?.name ?? "",
+                subcategory: subcategory.name,
+              })}
+            </p>
+          </div>
           <div className="flex flex-wrap gap-2">
             {available.map((channel) => (
               <button
@@ -166,7 +181,9 @@ export function ChannelTaxonomyPicker({
               </button>
             ))}
             {available.length === 0 ? (
-              <span className="text-sm text-muted-foreground">—</span>
+              <p className="text-sm text-muted-foreground">
+                {t("channelTaxonomyEmptySubcategory")}
+              </p>
             ) : null}
           </div>
         </div>
@@ -175,8 +192,11 @@ export function ChannelTaxonomyPicker({
       {unmappedChannels.length ? (
         <details className="text-sm">
           <summary className="cursor-pointer font-medium">
-            {t("otherChannels")}
+            {t("otherChannels")} ({unmappedChannels.length})
           </summary>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t("otherChannelsHint")}
+          </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {unmappedChannels.map((channel) => (
               <button

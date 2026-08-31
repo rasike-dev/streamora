@@ -205,6 +205,21 @@ async function processMessage(evt: VideoUploadedEvent) {
     (evt as any).correlationId ||
     `job-${evt.videoId}-${Date.now()}`;
 
+  // Stale RUNNING jobs (e.g. worker crash) block all retries — expire them first.
+  const staleBefore = new Date(Date.now() - 60 * 60 * 1000);
+  await prisma.processingJob.updateMany({
+    where: {
+      videoId: evt.videoId,
+      status: "RUNNING",
+      startedAt: { lt: staleBefore },
+    },
+    data: {
+      status: "FAILED",
+      completedAt: new Date(),
+      lastError: "Stale RUNNING job expired after worker restart/crash",
+    },
+  });
+
   // Check for duplicate running job BEFORE creating new one
   const existingRunning = await prisma.processingJob.findFirst({
     where: {
@@ -499,13 +514,20 @@ More detail: docs/day7-setup.md
     } catch (err: any) {
       console.error("Worker error:", err?.message || err);
 
-      // Mark intent/video failed (simple; improve later with retries/DLQ)
       try {
         const raw = JSON.parse(message.data.toString("utf-8")) as Partial<VideoUploadedEvent>;
         if (raw.videoId) {
+          await prisma.processingJob.updateMany({
+            where: { videoId: raw.videoId, status: "RUNNING" },
+            data: {
+              status: "FAILED",
+              completedAt: new Date(),
+              lastError: String(err?.message || err).slice(0, 2000),
+            },
+          });
           await prisma.video.update({
             where: { id: raw.videoId as string },
-            data: { status: "REJECTED" }, // or introduce PROCESSING_FAILED later
+            data: { status: "PROCESSING_FAILED" },
           });
         }
       } catch {}

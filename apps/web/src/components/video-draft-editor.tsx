@@ -538,13 +538,13 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
         onQueryChange={searchTags}
       />
 
-      {/* Visibility Selector */}
-      {editable && video && (
+      {/* Visibility — editable per API status rules, disabled while processing */}
+      {video && (
         <VideoVisibilitySelector
           videoId={videoId}
+          status={video.status}
           value={(video.visibility as any) || 'PRIVATE'}
           onUpdate={() => {
-            // Reload video data to get updated visibility
             apiFetch(`/creator/videos/${videoId}`, { cache: "no-store" })
               .then((r) => r.json())
               .then((data) => setVideo(data))
@@ -553,8 +553,8 @@ export default function VideoDraftEditor({ videoId, locale: propLocale }: { vide
         />
       )}
 
-      {/* Schedule Editor */}
-      {editable && video && (
+      {/* Schedule — editable per API status rules */}
+      {video && (
         <VideoScheduleEditor
           videoId={videoId}
           scheduledAt={video.scheduledAt}
