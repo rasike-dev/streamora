@@ -17,7 +17,12 @@ import { processMediaMessage, MediaUploadedEvent } from "./media-worker";
 
 const execFileAsync = promisify(execFile);
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  // Cloud Run + Pub/Sub: keep the pool small; flowControl limits concurrency.
+  datasourceUrl: process.env.DATABASE_URL
+    ? `${process.env.DATABASE_URL}${process.env.DATABASE_URL.includes("?") ? "&" : "?"}connection_limit=3&pool_timeout=30`
+    : undefined,
+});
 const pubsub = new PubSub({ projectId: process.env.GCP_PROJECT_ID });
 const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
 
@@ -498,6 +503,9 @@ More detail: docs/day7-setup.md
       : "GCP auth: Application Default Credentials (no GOOGLE_APPLICATION_CREDENTIALS)",
   );
 
+  // One in-flight job at a time — avoids Prisma pool exhaustion and duplicate ffmpeg runs.
+  subscription.setOptions({ flowControl: { maxMessages: 1 } });
+
   subscription.on("message", async (message) => {
     try {
       const data = JSON.parse(message.data.toString("utf-8")) as VideoUploadedEvent;
@@ -559,6 +567,7 @@ More detail: docs/day7-setup.md
       );
     } else {
       console.log(`Streamora Worker listening on media subscription: ${mediaSubName}`);
+      mediaSubscription.setOptions({ flowControl: { maxMessages: 1 } });
       mediaSubscription.on("message", async (message) => {
         try {
           const data = JSON.parse(message.data.toString("utf-8")) as MediaUploadedEvent;

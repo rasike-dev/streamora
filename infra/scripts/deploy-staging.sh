@@ -94,7 +94,10 @@ deploy_service "streamora-web-${ENV}" "${REGISTRY}/web:${IMAGE_TAG}" 3000 \
 
 WORKER_MEM="512Mi"
 WORKER_CPU="1"
-[[ "$DEMO_CHEAP" != "true" ]] && WORKER_MEM="2Gi" && WORKER_CPU="2"
+if [[ "$ENV" == "prod" ]] || [[ "$DEMO_CHEAP" != "true" ]]; then
+  WORKER_MEM="2Gi"
+  WORKER_CPU="2"
+fi
 
 gcloud run deploy "streamora-worker-${ENV}" \
   --image="${REGISTRY}/worker:${IMAGE_TAG}" \
