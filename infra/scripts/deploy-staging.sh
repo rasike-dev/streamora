@@ -106,7 +106,7 @@ gcloud run deploy "streamora-worker-${ENV}" \
   --no-allow-unauthenticated \
   --port=8080 \
   --min-instances="$WORKER_MIN" \
-  --max-instances=2 \
+  --max-instances=1 \
   --memory="$WORKER_MEM" \
   --cpu="$WORKER_CPU" \
   --timeout=3600 \

@@ -17,7 +17,14 @@ import { processMediaMessage, MediaUploadedEvent } from "./media-worker";
 
 const execFileAsync = promisify(execFile);
 
-const prisma = new PrismaClient();
+function workerDatabaseUrl(): string | undefined {
+  const url = process.env.DATABASE_URL;
+  if (!url) return undefined;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}connection_limit=2&pool_timeout=30`;
+}
+
+const prisma = new PrismaClient({ datasourceUrl: workerDatabaseUrl() });
 const pubsub = new PubSub({ projectId: process.env.GCP_PROJECT_ID });
 const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
 
@@ -527,7 +534,7 @@ More detail: docs/day7-setup.md
       message.ack();
       console.log(`Done: videoId=${data.videoId}`);
     } catch (err: any) {
-      console.error("Worker error:", err?.message || err);
+      console.error("Worker error:", err?.stack || err?.message || err);
 
       try {
         const raw = JSON.parse(message.data.toString("utf-8")) as Partial<VideoUploadedEvent>;
