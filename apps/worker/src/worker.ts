@@ -21,6 +21,17 @@ const prisma = new PrismaClient();
 const pubsub = new PubSub({ projectId: process.env.GCP_PROJECT_ID });
 const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
 
+/** Serialize all Pub/Sub handlers — video + media share one Prisma pool. */
+let workChain: Promise<void> = Promise.resolve();
+function enqueueWork<T>(fn: () => Promise<T>): Promise<T> {
+  const run = workChain.then(fn, fn);
+  workChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 function mustEnv(name: string) {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env ${name}`);
@@ -501,7 +512,8 @@ More detail: docs/day7-setup.md
   // One in-flight job at a time — avoids Prisma pool exhaustion and duplicate ffmpeg runs.
   subscription.setOptions({ flowControl: { maxMessages: 1 } });
 
-  subscription.on("message", async (message) => {
+  subscription.on("message", (message) => {
+    void enqueueWork(async () => {
     try {
       const data = JSON.parse(message.data.toString("utf-8")) as VideoUploadedEvent;
       if (data.type !== "video.uploaded") {
@@ -538,6 +550,7 @@ More detail: docs/day7-setup.md
       // Ack after recording failure — nack would redeliver and exhaust the DB pool.
       message.ack();
     }
+    });
   });
 
   subscription.on("error", (e: any) => {
@@ -563,7 +576,8 @@ More detail: docs/day7-setup.md
     } else {
       console.log(`Streamora Worker listening on media subscription: ${mediaSubName}`);
       mediaSubscription.setOptions({ flowControl: { maxMessages: 1 } });
-      mediaSubscription.on("message", async (message) => {
+      mediaSubscription.on("message", (message) => {
+        void enqueueWork(async () => {
         try {
           const data = JSON.parse(message.data.toString("utf-8")) as MediaUploadedEvent;
           if (data.type !== "media.uploaded") {
@@ -587,8 +601,9 @@ More detail: docs/day7-setup.md
               });
             }
           } catch {}
-          message.nack();
+          message.ack();
         }
+        });
       });
 
       mediaSubscription.on("error", (e: any) => {
