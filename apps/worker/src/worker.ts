@@ -20,6 +20,7 @@ const execFileAsync = promisify(execFile);
 function workerDatabaseUrl(): string | undefined {
   const url = process.env.DATABASE_URL;
   if (!url) return undefined;
+  if (/connection_limit=/.test(url)) return url;
   const sep = url.includes("?") ? "&" : "?";
   return `${url}${sep}connection_limit=2&pool_timeout=30`;
 }
@@ -625,4 +626,8 @@ More detail: docs/day7-setup.md
 main().catch((e) => {
   console.error(e);
   process.exit(1);
+});
+
+process.on("SIGTERM", () => {
+  void prisma.$disconnect().finally(() => process.exit(0));
 });
