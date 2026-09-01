@@ -17,12 +17,7 @@ import { processMediaMessage, MediaUploadedEvent } from "./media-worker";
 
 const execFileAsync = promisify(execFile);
 
-const prisma = new PrismaClient({
-  // Cloud Run + Pub/Sub: keep the pool small; flowControl limits concurrency.
-  datasourceUrl: process.env.DATABASE_URL
-    ? `${process.env.DATABASE_URL}${process.env.DATABASE_URL.includes("?") ? "&" : "?"}connection_limit=3&pool_timeout=30`
-    : undefined,
-});
+const prisma = new PrismaClient();
 const pubsub = new PubSub({ projectId: process.env.GCP_PROJECT_ID });
 const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
 
@@ -540,8 +535,8 @@ More detail: docs/day7-setup.md
         }
       } catch {}
 
-      // Nack so it can retry (default behavior)
-      message.nack();
+      // Ack after recording failure — nack would redeliver and exhaust the DB pool.
+      message.ack();
     }
   });
 
