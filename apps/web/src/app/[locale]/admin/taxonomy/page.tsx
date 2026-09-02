@@ -88,6 +88,7 @@ export default function AdminTaxonomyPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [newCategory, setNewCategory] = useState("");
   const [newSubcategory, setNewSubcategory] = useState("");
+  const [newChannel, setNewChannel] = useState("");
 
   const load = useCallback(async () => {
     if (!getAccessToken()) {
@@ -222,6 +223,20 @@ export default function AdminTaxonomyPage() {
       body: JSON.stringify({ categoryId, name: newSubcategory.trim() }),
     });
     if (ok) setNewSubcategory("");
+  };
+
+  const addChannel = async () => {
+    if (!newChannel.trim() || !subcategoryId) return;
+    const name = newChannel.trim();
+    const ok = await mutate(
+      "/admin/channels",
+      {
+        method: "POST",
+        body: JSON.stringify({ name, subcategoryId }),
+      },
+      t("channelAdded", { name }),
+    );
+    if (ok) setNewChannel("");
   };
 
   const rename = async (
@@ -622,46 +637,84 @@ export default function AdminTaxonomyPage() {
             <p className="mt-3 text-sm text-muted-foreground">
               {t("selectSubcategoryFirst")}
             </p>
-          ) : selectedSubcategory.channels.length === 0 ? (
-            <p className="mt-3 text-sm text-muted-foreground">
-              {t("emptyChannels")}
-            </p>
           ) : (
-            <ul className="mt-3 space-y-2">
-              {selectedSubcategory.channels.map((channel) => (
-                <li
-                  key={channel.id}
-                  className="rounded-xl border border-black/10 px-3 py-2 dark:border-white/10"
+            <>
+              {selectedSubcategory.channels.length === 0 ? (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {t("emptyChannels")}
+                </p>
+              ) : (
+                <ul className="mt-3 space-y-2">
+                  {selectedSubcategory.channels.map((channel) => (
+                    <li
+                      key={channel.id}
+                      className="rounded-xl border border-black/10 px-3 py-2 dark:border-white/10"
+                    >
+                      <div className="text-sm font-medium">
+                        {channel.localizedName}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {channel.slug} •{" "}
+                        {t("videos", { count: channel.videoCount })}
+                        {!channel.isActive ? ` • ${t("archived")}` : ""}
+                      </div>
+                      <select
+                        className={`${smallButton} mt-2`}
+                        defaultValue=""
+                        disabled={busy}
+                        onChange={(e) => {
+                          const destination = e.target.value;
+                          e.target.value = "";
+                          moveChannel(channel.id, destination);
+                        }}
+                      >
+                        <option value="">{t("move")}</option>
+                        {allSubcategories
+                          .filter((s) => s.id !== selectedSubcategory.id)
+                          .map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.label}
+                            </option>
+                          ))}
+                      </select>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="mt-4 flex gap-2">
+                <input
+                  className={input}
+                  value={newChannel}
+                  placeholder={t("namePlaceholder")}
+                  disabled={busy || !selectedSubcategory.isActive}
+                  onChange={(e) => setNewChannel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addChannel();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className={smallButton}
+                  disabled={
+                    busy ||
+                    !newChannel.trim() ||
+                    !selectedSubcategory.isActive
+                  }
+                  onClick={addChannel}
                 >
-                  <div className="text-sm font-medium">
-                    {channel.localizedName}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {channel.slug} • {t("videos", { count: channel.videoCount })}
-                    {!channel.isActive ? ` • ${t("archived")}` : ""}
-                  </div>
-                  <select
-                    className={`${smallButton} mt-2`}
-                    defaultValue=""
-                    disabled={busy}
-                    onChange={(e) => {
-                      const destination = e.target.value;
-                      e.target.value = "";
-                      moveChannel(channel.id, destination);
-                    }}
-                  >
-                    <option value="">{t("move")}</option>
-                    {allSubcategories
-                      .filter((s) => s.id !== selectedSubcategory.id)
-                      .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.label}
-                        </option>
-                      ))}
-                  </select>
-                </li>
-              ))}
-            </ul>
+                  {t("add")}
+                </button>
+              </div>
+              {!selectedSubcategory.isActive ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t("addChannelArchivedHint")}
+                </p>
+              ) : null}
+            </>
           )}
         </section>
       </div>
